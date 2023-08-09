@@ -175,12 +175,23 @@ class upsample(nn.Module):
                 x = self.upsampling(x)
             x = self.up[n](x, xd[n], style, mkldnn=mkldnn)
         return x
-    
+
+
+class PreNet(nn.Module):
+    def __init__(self, nbase, n_chan_in):
+        super().__init__()
+        self.down = convdown(n_chan_in, nbase[0], sz)
+        
+    def forward(self, x):
+        return self.down(x)
+
+
 class CPnet(nn.Module):
     def __init__(self, nbase, nout, sz,
                 residual_on=True, style_on=True, 
                 concatenation=False, mkldnn=False,
-                diam_mean=30.):
+                diam_mean=30., 
+                pre_net_chan=None):
         super(CPnet, self).__init__()
         self.nbase = nbase
         self.nout = nout
@@ -188,6 +199,9 @@ class CPnet(nn.Module):
         self.residual_on = residual_on
         self.style_on = style_on
         self.concatenation = concatenation
+        self.mkldnn = mkldnn if mkldnn is not None else False
+        if pre_net_chan is not None:
+            self.pre_net = PreNet(nbase=nbase, pre_net_chan=pre_net_chan)
         self.mkldnn = mkldnn if mkldnn is not None else False
         self.downsample = downsample(nbase, sz, residual_on=residual_on)
         nbaseup = nbase[1:]
@@ -202,6 +216,8 @@ class CPnet(nn.Module):
     def forward(self, data):
         if self.mkldnn:
             data = data.to_mkldnn()
+        if self.pre_net_chan is not None:
+            data = self.pre_net(data)
         T0    = self.downsample(data)
         if self.mkldnn:
             style = self.make_style(T0[-1].to_dense()) 
