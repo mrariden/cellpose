@@ -178,7 +178,7 @@ class upsample(nn.Module):
 
 
 class PreNet(nn.Module):
-    def __init__(self, nbase, n_chan_in):
+    def __init__(self, nbase, sz, n_chan_in):
         super().__init__()
         self.down = convdown(n_chan_in, nbase[0], sz)
         
@@ -201,7 +201,9 @@ class CPnet(nn.Module):
         self.concatenation = concatenation
         self.mkldnn = mkldnn if mkldnn is not None else False
         if pre_net_chan is not None:
-            self.pre_net = PreNet(nbase=nbase, pre_net_chan=pre_net_chan)
+            self.pre_net = PreNet(nbase=nbase, sz=sz, n_chan_in=pre_net_chan)
+        else: 
+            self.pre_net = None
         self.mkldnn = mkldnn if mkldnn is not None else False
         self.downsample = downsample(nbase, sz, residual_on=residual_on)
         nbaseup = nbase[1:]
@@ -216,7 +218,7 @@ class CPnet(nn.Module):
     def forward(self, data):
         if self.mkldnn:
             data = data.to_mkldnn()
-        if self.pre_net_chan is not None:
+        if self.pre_net is not None:
             data = self.pre_net(data)
         T0    = self.downsample(data)
         if self.mkldnn:
