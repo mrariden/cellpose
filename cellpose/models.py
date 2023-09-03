@@ -381,15 +381,15 @@ class CellposeModel(UnetModel):
         self.net_type = 'cellpose_residual_{}_style_{}_concatenation_{}'.format(ostr[residual_on],
                                                                                    ostr[style_on],
                                                                                    ostr[concatenation]
-                                                                                 ) 
-    
-    def eval(self, x, batch_size=8, channels=None, channel_axis=None, 
-             z_axis=None, normalize=True, invert=False, 
-             rescale=None, diameter=None, do_3D=False, anisotropy=None, net_avg=False, 
+                                                                                 )
+
+    def eval(self, x, batch_size=8, channels=None, channel_axis=None,
+             z_axis=None, normalize=True, invert=False,
+             rescale=None, diameter=None, do_3D=False, anisotropy=None, net_avg=False,
              augment=False, tile=True, tile_overlap=0.1,
              resample=True, interp=True,
              flow_threshold=0.4, cellprob_threshold=0.0,
-             compute_masks=True, min_size=15, stitch_threshold=0.0, progress=None,  
+             compute_masks=True, min_size=15, stitch_threshold=0.0, progress=None,
              loop_run=False, model_loaded=False):
         """
             segment list of images x, or 4D array - Z x nchan x Y x X
@@ -424,7 +424,7 @@ class CellposeModel(UnetModel):
                 invert image pixel intensity before running network
 
             diameter: float (optional, default None)
-                diameter for each image, 
+                diameter for each image,
                 if diameter is None, set to diam_mean or diam_train if available
 
             rescale: float (optional, default None)
@@ -453,13 +453,13 @@ class CellposeModel(UnetModel):
                 run dynamics at original image size (will be slower but create more accurate boundaries)
 
             interp: bool (optional, default True)
-                interpolate during 2D dynamics (not available in 3D) 
+                interpolate during 2D dynamics (not available in 3D)
                 (in previous versions it was False)
 
             flow_threshold: float (optional, default 0.4)
                 flow error threshold (all cells with errors below threshold are kept) (not used for 3D)
 
-            cellprob_threshold: float (optional, default 0.0) 
+            cellprob_threshold: float (optional, default 0.0)
                 all pixels with value above threshold kept for masks, decrease to find more and larger masks
 
             compute_masks: bool (optional, default True)
@@ -474,7 +474,7 @@ class CellposeModel(UnetModel):
 
             progress: pyqt progress bar (optional, default None)
                 to return progress bar status to GUI
-                            
+
             loop_run: bool (optional, default False)
                 internal variable for determining if model has been loaded, stops model loading in loop over images
 
@@ -490,90 +490,286 @@ class CellposeModel(UnetModel):
                 flows[k][0] = XY flow in HSV 0-255
                 flows[k][1] = XY flows at each pixel
                 flows[k][2] = cell probability (if > cellprob_threshold, pixel used for dynamics)
-                flows[k][3] = final pixel locations after Euler integration 
+                flows[k][3] = final pixel locations after Euler integration
 
             styles: list of 1D arrays of length 64, or single 1D array (if do_3D=True)
                 style vector summarizing each image, also used to estimate size of objects in image
 
         """
-        
-        if isinstance(x, list) or x.squeeze().ndim==5:
-            masks, styles, flows = [], [], []
-            tqdm_out = utils.TqdmToLogger(models_logger, level=logging.INFO)
-            nimg = len(x)
-            iterator = trange(nimg, file=tqdm_out) if nimg>1 else range(nimg)
-            for i in iterator:
-                maski, flowi, stylei = self.eval(x[i], 
-                                                 batch_size=batch_size, 
-                                                 channels=channels[i] if (len(channels)==len(x) and 
-                                                                          (isinstance(channels[i], list) or isinstance(channels[i], np.ndarray)) and
-                                                                          len(channels[i])==2) else channels, 
-                                                 channel_axis=channel_axis, 
-                                                 z_axis=z_axis, 
-                                                 normalize=normalize, 
-                                                 invert=invert, 
-                                                 rescale=rescale[i] if isinstance(rescale, list) or isinstance(rescale, np.ndarray) else rescale,
-                                                 diameter=diameter[i] if isinstance(diameter, list) or isinstance(diameter, np.ndarray) else diameter, 
-                                                 do_3D=do_3D, 
-                                                 anisotropy=anisotropy, 
-                                                 net_avg=net_avg, 
-                                                 augment=augment, 
-                                                 tile=tile, 
-                                                 tile_overlap=tile_overlap,
-                                                 resample=resample, 
-                                                 interp=interp,
-                                                 flow_threshold=flow_threshold,
-                                                 cellprob_threshold=cellprob_threshold, 
-                                                 compute_masks=compute_masks, 
-                                                 min_size=min_size, 
-                                                 stitch_threshold=stitch_threshold, 
-                                                 progress=progress,
-                                                 loop_run=(i>0),
-                                                 model_loaded=model_loaded)
-                masks.append(maski)
-                flows.append(flowi)
-                styles.append(stylei)
-            return masks, flows, styles
-        
+
+        parsed_kwargs = CellposeModel.parse_eval_args(locals())
+        if isinstance(x, list) or x.squeeze().ndim == 5:
+            return self.eval_list(x, **parsed_kwargs)
         else:
-            if not model_loaded and (isinstance(self.pretrained_model, list) and not net_avg and not loop_run):
-                self.net.load_model(self.pretrained_model[0], device=self.device)
-                
-            # reshape image (normalization happens in _run_cp)
-            x = transforms.convert_image(x, channels, channel_axis=channel_axis, z_axis=z_axis,
-                                         do_3D=(do_3D or stitch_threshold>0), 
-                                         normalize=False, invert=False, nchan=self.nchan)
-            if x.ndim < 4:
-                x = x[np.newaxis,...]
-            self.batch_size = batch_size
+            return self.eval_single(x, **parsed_kwargs)
 
-            if diameter is not None and diameter > 0:
-                rescale = self.diam_mean / diameter
-            elif rescale is None:
-                diameter = self.diam_labels
-                rescale = self.diam_mean / diameter
+    def eval_list(self, x_list, **kwargs):
 
-            masks, styles, dP, cellprob, p = self._run_cp(x, 
-                                                          compute_masks=compute_masks,
-                                                          normalize=normalize,
-                                                          invert=invert,
-                                                          rescale=rescale, 
-                                                          net_avg=net_avg, 
-                                                          resample=resample,
-                                                          augment=augment, 
-                                                          tile=tile, 
-                                                          tile_overlap=tile_overlap,
-                                                          flow_threshold=flow_threshold,
-                                                          cellprob_threshold=cellprob_threshold, 
-                                                          interp=interp,
-                                                          min_size=min_size, 
-                                                          do_3D=do_3D, 
-                                                          anisotropy=anisotropy,
-                                                          stitch_threshold=stitch_threshold,
-                                                          )
+        masks, styles, flows = [], [], []
+        tqdm_out = utils.TqdmToLogger(models_logger, level=logging.INFO)
+        nimg = len(x_list)
+        iterator = trange(nimg, file=tqdm_out) if nimg > 1 else range(nimg)
+
+        for i in iterator:
+            m, s, f = self.eval_single(x[i], **kwargs)
+            masks.append(m)
+            styles.append(s)
+            flows.append(f)
+        return masks, styles, flows
+
+    def eval_single(self, x_single, **kwargs):
+        """ segment single image x """
+
+        model_loaded = kwargs['model_loaded']
+        net_avg = kwargs['net_avg']
+        loop_run = kwargs['loop_run']
+
+        if not model_loaded and (isinstance(self.pretrained_model, list) and not net_avg and not loop_run):
+            self.net.load_model(self.pretrained_model[0], device=self.device)
+
+        # reshape image (normalization happens in _run_cp)
+        x = transforms.convert_image(x_single, **kwargs)
+
+        if x.ndim < 4:
+            x = x[np.newaxis, ...]
+        self.batch_size = kwargs['batch_size']
+
+        if kwargs['diameter'] is not None and kwargs['diameter'] > 0:
+            kwargs['rescale'] = self.diam_mean / kwargs['diameter']
+        elif kwargs['rescale'] is None:
+            diameter = self.diam_labels
+            kwargs['diameter'] = self.diam_mean / diameter
+
+        masks, styles, dP, cellprob, p = self._run_cp(x, **kwargs)
+
+        flows = [plot.dx_to_circ(dP), dP, cellprob, p]
+        return masks, flows, styles
+
+    @staticmethod
+    def parse_eval_args(args):
+        parsed_args = {'batch_size': args.get('batch_size', 8),
+                       'channels': args.get('channels', None),
+                       'channel_axis': args.get('channel_axis', None),
+                       'z_axis': args.get('z_axis', None),
+                       'normalize': args.get('normalize', True),
+                       'invert': args.get('invert', False),
+                       'rescale': args.get('rescale', None),
+                       'diameter': args.get('diameter', None),
+                       'do_3D': args.get('do_3D', False),
+                       'anisotropy': args.get('anisotropy', None),
+                       'net_avg': args.get('net_avg', False),
+                       'augment': args.get('augment', False),
+                       'tile': args.get('tile', True),
+                       'tile_overlap': args.get('tile_overlap', 0.1),
+                       'resample': args.get('resample', True),
+                       'interp': args.get('interp', True),
+                       'flow_threshold': args.get('flow_threshold', 0.4),
+                       'cellprob_threshold': args.get('cellprob_threshold', 0.0),
+                       'compute_masks': args.get('compute_masks', True),
+                       'min_size': args.get('min_size', 15),
+                       'stitch_threshold': args.get('stitch_threshold', 0.0),
+                       'progress': args.get('progress', None),
+                       'loop_run': args.get('loop_run', False),
+                       'model_loaded': args.get('model_loaded', False)
+                       }
+
+        return parsed_args
             
-            flows = [plot.dx_to_circ(dP), dP, cellprob, p]
-            return masks, flows, styles
+
+
+
+
+    # def eval(self, x, batch_size=8, channels=None, channel_axis=None,
+    #          z_axis=None, normalize=True, invert=False,
+    #          rescale=None, diameter=None, do_3D=False, anisotropy=None, net_avg=False,
+    #          augment=False, tile=True, tile_overlap=0.1,
+    #          resample=True, interp=True,
+    #          flow_threshold=0.4, cellprob_threshold=0.0,
+    #          compute_masks=True, min_size=15, stitch_threshold=0.0, progress=None,
+    #          loop_run=False, model_loaded=False):
+    #     """
+    #         segment list of images x, or 4D array - Z x nchan x Y x X
+    #
+    #         Parameters
+    #         ----------
+    #         x: list or array of images
+    #             can be list of 2D/3D/4D images, or array of 2D/3D/4D images
+    #
+    #         batch_size: int (optional, default 8)
+    #             number of 224x224 patches to run simultaneously on the GPU
+    #             (can make smaller or bigger depending on GPU memory usage)
+    #
+    #         channels: list (optional, default None)
+    #             list of channels, either of length 2 or of length number of images by 2.
+    #             First element of list is the channel to segment (0=grayscale, 1=red, 2=green, 3=blue).
+    #             Second element of list is the optional nuclear channel (0=none, 1=red, 2=green, 3=blue).
+    #             For instance, to segment grayscale images, input [0,0]. To segment images with cells
+    #             in green and nuclei in blue, input [2,3]. To segment one grayscale image and one
+    #             image with cells in green and nuclei in blue, input [[0,0], [2,3]].
+    #
+    #         channel_axis: int (optional, default None)
+    #             if None, channels dimension is attempted to be automatically determined
+    #
+    #         z_axis: int (optional, default None)
+    #             if None, z dimension is attempted to be automatically determined
+    #
+    #         normalize: bool (default, True)
+    #             normalize data so 0.0=1st percentile and 1.0=99th percentile of image intensities in each channel
+    #
+    #         invert: bool (optional, default False)
+    #             invert image pixel intensity before running network
+    #
+    #         diameter: float (optional, default None)
+    #             diameter for each image,
+    #             if diameter is None, set to diam_mean or diam_train if available
+    #
+    #         rescale: float (optional, default None)
+    #             resize factor for each image, if None, set to 1.0;
+    #             (only used if diameter is None)
+    #
+    #         do_3D: bool (optional, default False)
+    #             set to True to run 3D segmentation on 4D image input
+    #
+    #         anisotropy: float (optional, default None)
+    #             for 3D segmentation, optional rescaling factor (e.g. set to 2.0 if Z is sampled half as dense as X or Y)
+    #
+    #         net_avg: bool (optional, default False)
+    #             runs the 4 built-in networks and averages them if True, runs one network if False
+    #
+    #         augment: bool (optional, default False)
+    #             tiles image with overlapping tiles and flips overlapped regions to augment
+    #
+    #         tile: bool (optional, default True)
+    #             tiles image to ensure GPU/CPU memory usage limited (recommended)
+    #
+    #         tile_overlap: float (optional, default 0.1)
+    #             fraction of overlap of tiles when computing flows
+    #
+    #         resample: bool (optional, default True)
+    #             run dynamics at original image size (will be slower but create more accurate boundaries)
+    #
+    #         interp: bool (optional, default True)
+    #             interpolate during 2D dynamics (not available in 3D)
+    #             (in previous versions it was False)
+    #
+    #         flow_threshold: float (optional, default 0.4)
+    #             flow error threshold (all cells with errors below threshold are kept) (not used for 3D)
+    #
+    #         cellprob_threshold: float (optional, default 0.0)
+    #             all pixels with value above threshold kept for masks, decrease to find more and larger masks
+    #
+    #         compute_masks: bool (optional, default True)
+    #             Whether or not to compute dynamics and return masks.
+    #             This is set to False when retrieving the styles for the size model.
+    #
+    #         min_size: int (optional, default 15)
+    #             minimum number of pixels per mask, can turn off with -1
+    #
+    #         stitch_threshold: float (optional, default 0.0)
+    #             if stitch_threshold>0.0 and not do_3D, masks are stitched in 3D to return volume segmentation
+    #
+    #         progress: pyqt progress bar (optional, default None)
+    #             to return progress bar status to GUI
+    #
+    #         loop_run: bool (optional, default False)
+    #             internal variable for determining if model has been loaded, stops model loading in loop over images
+    #
+    #         model_loaded: bool (optional, default False)
+    #             internal variable for determining if model has been loaded, used in __main__.py
+    #
+    #         Returns
+    #         -------
+    #         masks: list of 2D arrays, or single 3D array (if do_3D=True)
+    #             labelled image, where 0=no masks; 1,2,...=mask labels
+    #
+    #         flows: list of lists 2D arrays, or list of 3D arrays (if do_3D=True)
+    #             flows[k][0] = XY flow in HSV 0-255
+    #             flows[k][1] = XY flows at each pixel
+    #             flows[k][2] = cell probability (if > cellprob_threshold, pixel used for dynamics)
+    #             flows[k][3] = final pixel locations after Euler integration
+    #
+    #         styles: list of 1D arrays of length 64, or single 1D array (if do_3D=True)
+    #             style vector summarizing each image, also used to estimate size of objects in image
+    #
+    #     """
+    #
+    #     if isinstance(x, list) or x.squeeze().ndim==5:
+    #         masks, styles, flows = [], [], []
+    #         tqdm_out = utils.TqdmToLogger(models_logger, level=logging.INFO)
+    #         nimg = len(x)
+    #         iterator = trange(nimg, file=tqdm_out) if nimg>1 else range(nimg)
+    #         for i in iterator:
+    #             maski, flowi, stylei = self.eval(x[i],
+    #                                              batch_size=batch_size,
+    #                                              channels=channels[i] if (len(channels)==len(x) and
+    #                                                                       (isinstance(channels[i], list) or isinstance(channels[i], np.ndarray)) and
+    #                                                                       len(channels[i])==2) else channels,
+    #                                              channel_axis=channel_axis,
+    #                                              z_axis=z_axis,
+    #                                              normalize=normalize,
+    #                                              invert=invert,
+    #                                              rescale=rescale[i] if isinstance(rescale, list) or isinstance(rescale, np.ndarray) else rescale,
+    #                                              diameter=diameter[i] if isinstance(diameter, list) or isinstance(diameter, np.ndarray) else diameter,
+    #                                              do_3D=do_3D,
+    #                                              anisotropy=anisotropy,
+    #                                              net_avg=net_avg,
+    #                                              augment=augment,
+    #                                              tile=tile,
+    #                                              tile_overlap=tile_overlap,
+    #                                              resample=resample,
+    #                                              interp=interp,
+    #                                              flow_threshold=flow_threshold,
+    #                                              cellprob_threshold=cellprob_threshold,
+    #                                              compute_masks=compute_masks,
+    #                                              min_size=min_size,
+    #                                              stitch_threshold=stitch_threshold,
+    #                                              progress=progress,
+    #                                              loop_run=(i>0),
+    #                                              model_loaded=model_loaded)
+    #             masks.append(maski)
+    #             flows.append(flowi)
+    #             styles.append(stylei)
+    #         return masks, flows, styles
+    #
+    #     else:
+    #         if not model_loaded and (isinstance(self.pretrained_model, list) and not net_avg and not loop_run):
+    #             self.net.load_model(self.pretrained_model[0], device=self.device)
+    #
+    #         # reshape image (normalization happens in _run_cp)
+    #         x = transforms.convert_image(x, channels, channel_axis=channel_axis, z_axis=z_axis,
+    #                                      do_3D=(do_3D or stitch_threshold>0),
+    #                                      normalize=False, invert=False, nchan=self.nchan)
+    #         if x.ndim < 4:
+    #             x = x[np.newaxis,...]
+    #         self.batch_size = batch_size
+    #
+    #         if diameter is not None and diameter > 0:
+    #             rescale = self.diam_mean / diameter
+    #         elif rescale is None:
+    #             diameter = self.diam_labels
+    #             rescale = self.diam_mean / diameter
+    #
+    #         masks, styles, dP, cellprob, p = self._run_cp(x,
+    #                                                       compute_masks=compute_masks,
+    #                                                       normalize=normalize,
+    #                                                       invert=invert,
+    #                                                       rescale=rescale,
+    #                                                       net_avg=net_avg,
+    #                                                       resample=resample,
+    #                                                       augment=augment,
+    #                                                       tile=tile,
+    #                                                       tile_overlap=tile_overlap,
+    #                                                       flow_threshold=flow_threshold,
+    #                                                       cellprob_threshold=cellprob_threshold,
+    #                                                       interp=interp,
+    #                                                       min_size=min_size,
+    #                                                       do_3D=do_3D,
+    #                                                       anisotropy=anisotropy,
+    #                                                       stitch_threshold=stitch_threshold,
+    #                                                       )
+    #
+    #         flows = [plot.dx_to_circ(dP), dP, cellprob, p]
+    #         return masks, flows, styles
 
     def _run_cp(self, x, compute_masks=True, normalize=True, invert=False,
                 rescale=1.0, net_avg=False, resample=True,
@@ -792,7 +988,7 @@ class CellposeModel(UnetModel):
                                      learning_rate=learning_rate, n_epochs=n_epochs, 
                                      momentum=momentum, weight_decay=weight_decay, 
                                      SGD=SGD, batch_size=batch_size, nimg_per_epoch=nimg_per_epoch, 
-                                     rescale=rescale, model_name=model_name)
+                                     rescale=rescale, model_name=model_name, use_lr_scheduler=use_lr_scheduler)
         self.pretrained_model = model_path
         return model_path
 

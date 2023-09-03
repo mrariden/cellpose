@@ -15,12 +15,6 @@ from . import transforms, io, dynamics, utils
 
 sz = 3
 
-def convbatchrelu(in_channels, out_channels, sz):
-    return nn.Sequential(
-        nn.Conv2d(in_channels, out_channels, sz, padding=sz//2),
-        nn.BatchNorm2d(out_channels, eps=1e-5),
-        nn.ReLU(inplace=True),
-    )  
 
 def batchconv(in_channels, out_channels, sz):
     return nn.Sequential(

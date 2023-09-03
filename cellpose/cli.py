@@ -157,5 +157,7 @@ def get_arg_parser():
     training_args.add_argument('--model_name_out', default=None, type=str,
                                help='Name of model to save as, defaults to name describing model architecture. '
                                     'Model is saved in the folder specified by --dir in models subfolder.')
+    training_args.add_argument('--use_lr_scheduler', action='store_true',
+                                 help='use cosine annealing learning rate scheduler, defaults to constant learning rate')
 
     return parser

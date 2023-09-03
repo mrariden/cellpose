@@ -5,6 +5,7 @@ Copright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer an
 import os, sys, time, shutil, tempfile, datetime, pathlib, subprocess
 import logging
 import numpy as np
+import wandb
 from tqdm import trange, tqdm
 from urllib.parse import urlparse
 import tempfile
@@ -148,6 +149,8 @@ class UnetModel():
         
         if pretrained_model is not None and isinstance(pretrained_model, str):
             self.net.load_model(pretrained_model, device=self.device)
+
+        self.lr_scheduler = None
 
     def eval(self, x, batch_size=8, channels=None, channels_last=False, invert=False, normalize=True,
              rescale=None, do_3D=False, anisotropy=None, net_avg=False, augment=False,
@@ -651,7 +654,7 @@ class UnetModel():
               test_data=None, test_labels=None, test_files=None,
               channels=None, normalize=True, save_path=None, save_every=100, save_each=False,
               learning_rate=0.2, n_epochs=500, momentum=0.9, weight_decay=0.00001, batch_size=8, 
-              nimg_per_epoch=None, min_train_masks=5, rescale=False, model_name=None):
+              nimg_per_epoch=None, min_train_masks=5, rescale=False, model_name=None, use_lr_scheduler=False):
         """ train function uses 0-1 mask label and boundary pixels for training """
 
         nimg = len(train_data)
@@ -698,7 +701,8 @@ class UnetModel():
                                     save_path=save_path, save_every=save_every, save_each=save_each,
                                     learning_rate=learning_rate, n_epochs=n_epochs, momentum=momentum, 
                                     weight_decay=weight_decay, SGD=True, batch_size=batch_size, 
-                                    nimg_per_epoch=nimg_per_epoch, rescale=rescale, model_name=model_name)
+                                    nimg_per_epoch=nimg_per_epoch, rescale=rescale, model_name=model_name,
+                                    use_lr_scheduler=use_lr_scheduler)
 
         # find threshold using validation set
         core_logger.info('>>>> finding best thresholds using validation set')
@@ -778,8 +782,11 @@ class UnetModel():
             self.optimizer.current_lr = learning_rate
         
     def _set_learning_rate(self, lr):
-        for param_group in self.optimizer.param_groups:
-            param_group['lr'] = lr
+        if self.lr_scheduler is not None:
+            return
+        else:
+            for param_group in self.optimizer.param_groups:
+                param_group['lr'] = lr
     
     def _set_criterion(self):
         if self.unet:
@@ -792,38 +799,20 @@ class UnetModel():
               test_data=None, test_labels=None,
               save_path=None, save_every=100, save_each=False,
               learning_rate=0.2, n_epochs=500, momentum=0.9, weight_decay=0.00001, 
-              SGD=True, batch_size=8, nimg_per_epoch=None, rescale=True, model_name=None): 
+              SGD=True, batch_size=8, nimg_per_epoch=None, rescale=True, model_name=None, use_lr_scheduler=False):
         """ train function uses loss function self.loss_fn in models.py"""
         
         d = datetime.datetime.now()
-        
-        self.n_epochs = n_epochs
-        if isinstance(learning_rate, (list, np.ndarray)):
-            if isinstance(learning_rate, np.ndarray) and learning_rate.ndim > 1:
-                raise ValueError('learning_rate.ndim must equal 1')
-            elif len(learning_rate) != n_epochs:
-                raise ValueError('if learning_rate given as list or np.ndarray it must have length n_epochs')
-            self.learning_rate = learning_rate
-            self.learning_rate_const = mode(learning_rate)[0][0]
-        else:
-            self.learning_rate_const = learning_rate
-            # set learning rate schedule    
-            if SGD:
-                LR = np.linspace(0, self.learning_rate_const, 10)
-                if self.n_epochs > 250:
-                    LR = np.append(LR, self.learning_rate_const*np.ones(self.n_epochs-100))
-                    for i in range(10):
-                        LR = np.append(LR, LR[-1]/2 * np.ones(10))
-                else:
-                    LR = np.append(LR, self.learning_rate_const*np.ones(max(0,self.n_epochs-10)))
-            else:
-                LR = self.learning_rate_const * np.ones(self.n_epochs)
-            self.learning_rate = LR
 
-        self.batch_size = batch_size
+        self._set_training_params(SGD, batch_size, learning_rate, momentum, n_epochs, weight_decay)
         self._set_optimizer(self.learning_rate[0], momentum, weight_decay, SGD)
         self._set_criterion()
-        
+
+        if use_lr_scheduler:
+            self.optimizer = torch.optim.SGD(self.net.parameters(), lr=1e-3, momentum=momentum)
+            self.lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(self.optimizer,
+                                                                                     T_0=n_epochs//10,
+                                                                                     eta_min=learning_rate)
         nimg = len(train_data)
 
         # compute average cell diameter
@@ -845,8 +834,7 @@ class UnetModel():
 
         nchan = train_data[0].shape[0]
         core_logger.info('>>>> training network with %d channel input <<<<'%nchan)
-        core_logger.info('>>>> LR: %0.5f, batch_size: %d, weight_decay: %0.5f'%(self.learning_rate_const, self.batch_size, weight_decay))
-        
+
         if test_data is not None:
             core_logger.info(f'>>>> ntrain = {nimg}, ntest = {len(test_data)}')
         else:
@@ -883,7 +871,7 @@ class UnetModel():
             inds_all = np.hstack((inds_all, rperm))
         
         for iepoch in range(self.n_epochs):    
-            if SGD:
+            if SGD and self.lr_scheduler is None:
                 self._set_learning_rate(self.learning_rate[iepoch])
             np.random.seed(iepoch)
             rperm = inds_all[iepoch*nimg_per_epoch:(iepoch+1)*nimg_per_epoch]
@@ -897,36 +885,48 @@ class UnetModel():
                 if self.unet and lbl.shape[1]>1 and rescale:
                     lbl[:,1] *= scale[:,np.newaxis,np.newaxis]**2#diam_batch[:,np.newaxis,np.newaxis]**2
                 train_loss = self._train_step(imgi, lbl)
+                if self.lr_scheduler is not None:
+                    self.lr_scheduler.step(iepoch + ibatch/nimg_per_epoch)
                 lavg += train_loss
                 nsum += len(imgi) 
             
-            if iepoch%10==0 or iepoch==5:
-                lavg = lavg / nsum
-                if test_data is not None:
-                    lavgt, nsum = 0., 0
-                    np.random.seed(42)
-                    rperm = np.arange(0, len(test_data), 1, int)
-                    for ibatch in range(0,len(test_data),batch_size):
-                        inds = rperm[ibatch:ibatch+batch_size]
-                        rsc = diam_test[inds] / self.diam_mean if rescale else np.ones(len(inds), np.float32)
-                        imgi, lbl, scale = transforms.random_rotate_and_resize(
-                                            [test_data[i] for i in inds], Y=[test_labels[i][1:] for i in inds], 
-                                            scale_range=0., rescale=rsc, unet=self.unet) 
-                        if self.unet and lbl.shape[1]>1 and rescale:
-                            lbl[:,1] *= scale[:,np.newaxis,np.newaxis]**2
+            lavg = lavg / nsum
 
-                        test_loss = self._test_eval(imgi, lbl)
-                        lavgt += test_loss
-                        nsum += len(imgi)
+            lr_t = self.lr_scheduler.get_last_lr()[-1] if self.lr_scheduler is not None else self.learning_rate[iepoch]
 
-                    core_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, Loss Test %2.4f, LR %2.4f'%
-                            (iepoch, time.time()-tic, lavg, lavgt/nsum, self.learning_rate[iepoch]))
-                else:
-                    core_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, LR %2.4f'%
-                            (iepoch, time.time()-tic, lavg, self.learning_rate[iepoch]))
-                
-                lavg, nsum = 0, 0
-                            
+            if test_data is not None:
+                lavgt, nsum = 0., 0
+                np.random.seed(42)
+                rperm = np.arange(0, len(test_data), 1, int)
+                for ibatch in range(0,len(test_data),batch_size):
+                    inds = rperm[ibatch:ibatch+batch_size]
+                    rsc = diam_test[inds] / self.diam_mean if rescale else np.ones(len(inds), np.float32)
+                    imgi, lbl, scale = transforms.random_rotate_and_resize(
+                        [test_data[i] for i in inds], Y=[test_labels[i][1:] for i in inds],
+                        scale_range=0., rescale=rsc, unet=self.unet)
+                    if self.unet and lbl.shape[1]>1 and rescale:
+                        lbl[:,1] *= scale[:,np.newaxis,np.newaxis]**2
+
+                    test_loss = self._test_eval(imgi, lbl)
+                    lavgt += test_loss
+                    nsum += len(imgi)
+                core_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, Loss Test %2.4f, LR %2.4f'%
+                                 (iepoch, time.time()-tic, lavg, lavgt/nsum, lr_t))
+            else:
+                core_logger.info('Epoch %d, Time %4.1fs, Loss %2.4f, LR %2.4f'%
+                                 (iepoch, time.time()-tic, lavg, lr_t))
+            wandb.log(
+                {
+                    "train_loss": lavg,
+                    "time": time.time()-tic,
+                    "test_loss": lavgt/nsum if test_data is not None else None,
+                    "learning_rate": lr_t,
+                    "epoch": iepoch,
+                }
+            )
+            lavg, nsum = 0, 0
+
+
             if save_path is not None:
                 if iepoch==self.n_epochs-1 or iepoch%save_every==1:
                     # save model at the end
@@ -952,3 +952,36 @@ class UnetModel():
         # reset to mkldnn if available
         self.net.mkldnn = self.mkldnn
         return file_name
+
+    def _set_training_params(self, SGD, batch_size, learning_rate, momentum, n_epochs, weight_decay):
+        """ set training parameters for network
+
+        Accepts either a single value or a list of values for each epoch
+        If the list is shorter than n_epochs, the last value is used for the remaining epochs
+        If the learning_rate is a float, the learning rate is linearly ramped up from 0 to the given value, and then
+            exponentially decayed to 0.1*learning_rate over the remaining epochs
+        """
+        self.n_epochs = n_epochs
+        if isinstance(learning_rate, (list, np.ndarray)):
+            if isinstance(learning_rate, np.ndarray) and learning_rate.ndim > 1:
+                raise ValueError('learning_rate.ndim must equal 1')
+            elif len(learning_rate) != n_epochs:
+                raise ValueError('if learning_rate given as list or np.ndarray it must have length n_epochs')
+            self.learning_rate = learning_rate
+            self.learning_rate_const = mode(learning_rate)[0][0]
+        else:
+            self.learning_rate_const = learning_rate
+            # set learning rate schedule
+            if SGD:
+                LR = np.linspace(0, self.learning_rate_const, 10)
+                if self.n_epochs > 250:
+                    LR = np.append(LR, self.learning_rate_const * np.ones(self.n_epochs - 100))
+                    for i in range(10):
+                        LR = np.append(LR, LR[-1] / 2 * np.ones(10))
+                else:
+                    LR = np.append(LR, self.learning_rate_const * np.ones(max(0, self.n_epochs - 10)))
+            else:
+                LR = self.learning_rate_const * np.ones(self.n_epochs)
+            self.learning_rate = LR
+        self.batch_size = batch_size
+

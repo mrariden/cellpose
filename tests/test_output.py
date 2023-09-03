@@ -57,6 +57,31 @@ def test_cyto2_to_seg(data_dir, image_names):
     masks, flows, styles, diams = model.eval(imgs, diameter=30, channels=channels, net_avg=False)
     io.masks_flows_to_seg(imgs, masks, flows, diams, file_names)
 
+
+def test_CellposeModel_to_seg():
+    import tifffile
+    import skimage.transform as transform
+
+    path_to_file = "/home/willow/Downloads/issue.tiff"
+    tiff_file = tifffile.TiffFile(path_to_file)
+    img = tiff_file.asarray()
+    # img = np.zeros((59, 176, 176), dtype=np.uint16)
+    diameter = 90
+
+    rescale_factor = 0.8
+
+    new_height = int(img.shape[-2] * rescale_factor)
+    new_width = int(img.shape[-1] * rescale_factor)
+
+    output_shape = (59, new_height, new_width)
+
+    rescaled_image = transform.resize(img, output_shape, mode='reflect', anti_aliasing=True, preserve_range=True)
+
+    model = models.CellposeModel(model_type='cyto', gpu=True)
+    masks, flows, styles = model.eval(rescaled_image, diameter=diameter, resample=False, channels=[0, 0], do_3D=False,
+                                      stitch_threshold=0.2)
+
+
 def test_class_3D(data_dir, image_names):
     clear_output(data_dir, image_names)
     img = io.imread(str(data_dir.joinpath('3D').joinpath('rgb_3D.tif')))
