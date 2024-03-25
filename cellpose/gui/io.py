@@ -3,6 +3,7 @@ Copyright © 2023 Howard Hughes Medical Institute, Authored by Carsen Stringer a
 """
 
 import os, datetime, gc, warnings, glob, shutil, copy
+import zarr
 from natsort import natsorted
 import numpy as np
 import cv2
@@ -137,6 +138,30 @@ def _load_image(parent, filename=None, load_seg=True, load_3D=False):
         parent.enable_buttons()
         if load_mask:
             _load_masks(parent, filename=mask_file)
+
+
+def _load_image_zarr(parent, filename=None, load_seg=True, load_3D=False):
+    # TODO: fix this. it is hacked together and I have no idea if it is robust
+    if filename is None:
+        # zarr needs to open what looks like a directory:
+        filename = QFileDialog.getExistingDirectory(parent, "Load image")
+    load_mask = False
+    try:
+        print(f"GUI_INFO: loading image: {filename}")
+        image = zarr.load(filename)
+        parent.loaded = True
+    except Exception as e:
+        print("ERROR: images not compatible")
+        print(f"ERROR: {e}")
+
+    if parent.loaded:
+        parent.reset()
+        parent.filename = filename
+        filename = os.path.split(parent.filename)[-1]
+        _initialize_images(parent, image, load_3D=load_3D)
+        parent.loaded = True
+        parent.enable_buttons()
+
 
 
 def _initialize_images(parent, image, load_3D=False):
