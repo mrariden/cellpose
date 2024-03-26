@@ -1119,12 +1119,49 @@ class MainW(QMainWindow):
         idx = np.nonzero(np.array(fnames) == f0)[0][0]
         return images, idx
 
+    def get_zarr_tile_list(self):
+        # get list of tiles from zarr
+        # zarr_path is like original_images/CG8_Merged.zarr/flow_fields/tile_x0_y0 and need to get the dir up 2 levels
+        zarr_tiles_dir = os.path.split(self.zarr_path)[0]
+        zarr_tile_list = os.listdir(zarr_tiles_dir)
+        zarr_tile_list = [t for t in zarr_tile_list if t.startswith("tile_")]
+        zarr_tile_list.sort()
+        return zarr_tile_list
+
     def get_prev_image(self):
+        if self.zarr_path:
+            # assume zarr is loaded and get next tile
+            # file tiles, sort the list, and then get the next tile
+            this_tile = os.path.split(self.zarr_path)[-1]
+            zarr_tiles = self.get_zarr_tile_list()
+            idx = zarr_tiles.index(this_tile)
+            if idx == 0:
+                next_tile = self.zarr_path.replace(this_tile, zarr_tiles[-1])
+            else:
+                next_tile = self.zarr_path.replace(this_tile, zarr_tiles[idx - 1])
+            self.zarr_path = next_tile
+            io._load_image_zarr(self, filename=next_tile)
+            return
+
         images, idx = self.get_files()
         idx = (idx - 1) % len(images)
         io._load_image(self, filename=images[idx])
 
     def get_next_image(self, load_seg=True):
+        if self.zarr_path:
+            # assume zarr is loaded and get next tile
+            # file tiles, sort the list, and then get the next tile
+            this_tile = os.path.split(self.zarr_path)[-1]
+            zarr_tiles = self.get_zarr_tile_list()
+            idx = zarr_tiles.index(this_tile)
+            if idx == len(zarr_tiles) - 1:
+                next_tile = self.zarr_path.replace(this_tile, zarr_tiles[0])
+            else:
+                next_tile = self.zarr_path.replace(this_tile, zarr_tiles[idx + 1])
+            self.zarr_path = next_tile
+            io._load_image_zarr(self, filename=next_tile)
+            return
+
         images, idx = self.get_files()
         idx = (idx + 1) % len(images)
         io._load_image(self, filename=images[idx], load_seg=load_seg)

@@ -140,8 +140,41 @@ def _load_image(parent, filename=None, load_seg=True, load_3D=False):
             _load_masks(parent, filename=mask_file)
 
 
+def _load_seg_zarr(parent, filename=None, load_seg=False, load_3D=False):
+    """ load image with filename; if None, open QFileDialog """
+    if load_3D:
+        raise NotImplementedError("3D not implemented for zarr")
+
+    if filename is None:
+        filename = QFileDialog.getExistingDirectory(parent, "Load labelled data")
+    try:
+        print(f"GUI_INFO: loading image: {filename}")
+        image = zarr.load(filename)
+        parent.loaded = True
+    except Exception as e:
+        print("ERROR: images not found")
+        print(f"ERROR: {e}")
+
+    manual_file = filename.replace('tiles', 'masks')
+    load_mask = False
+    if os.path.isdir(manual_file) and load_seg:
+        _load_zarr_masks(parent, manual_file)
+
+    # if parent.loaded:
+    #     parent.reset()
+    #     parent.filename = filename
+    #     _initialize_images(parent, image, load_3D=False)
+    #     parent.loaded = True
+    #     parent.enable_buttons()
+
+
 def _load_image_zarr(parent, filename=None, load_seg=True, load_3D=False):
     # TODO: fix this. it is hacked together and I have no idea if it is robust
+
+    if load_3D:
+        raise NotImplementedError("3D not implemented for zarr")
+
+    parent.disableAutosave.setChecked(True)
 
     if filename is None:
         # zarr needs to open what looks like a directory:
@@ -158,10 +191,10 @@ def _load_image_zarr(parent, filename=None, load_seg=True, load_3D=False):
     if parent.loaded:
         parent.reset()
         parent.filename = filename
-        filename = os.path.split(parent.filename)[-1]
         _initialize_images(parent, image, load_3D=load_3D)
         parent.loaded = True
         parent.enable_buttons()
+        _load_seg_zarr(parent, filename=parent.filename, load_seg=load_seg, load_3D=load_3D)
 
 def _save_image_zarr(parent):
     """ Intended to work with a zarr file that has already been loaded.
@@ -178,6 +211,7 @@ def _save_image_zarr(parent):
     zarr_path = parent.zarr_path
     prob_maps_path = zarr_path.replace("tiles", "prob_maps")
     flow_fields_path = zarr_path.replace("tiles", "flow_fields")
+    mask_path = zarr_path.replace("tiles", "masks")
 
     # Get the flow_fields and prob_maps
     # TODO: why does parent.flows[0][0, ..., 2] exist? What's in the third channel?
@@ -187,6 +221,7 @@ def _save_image_zarr(parent):
     print(f"GUI_INFO: saving cellpose IR to zarr: {parent.zarr_path}")
     zarr.save(prob_maps_path, probs)
     zarr.save(flow_fields_path, flows)
+    zarr.save(mask_path, parent.cellpix)
 
 def _initialize_images(parent, image, load_3D=False):
     """ format image for GUI """
@@ -489,6 +524,40 @@ def _load_masks(parent, filename=None):
         filename = name[0]
     print(f"GUI_INFO: loading masks: {filename}")
     masks = imread(filename)
+    outlines = None
+    if masks.ndim > 3:
+        # Z x nchannels x Ly x Lx
+        if masks.shape[-1] > 5:
+            parent.flows = list(np.transpose(masks[:, :, :, 2:], (3, 0, 1, 2)))
+            outlines = masks[..., 1]
+            masks = masks[..., 0]
+        else:
+            parent.flows = list(np.transpose(masks[:, :, :, 1:], (3, 0, 1, 2)))
+            masks = masks[..., 0]
+    elif masks.ndim == 3:
+        if masks.shape[-1] < 5:
+            masks = masks[np.newaxis, :, :, 0]
+    elif masks.ndim < 3:
+        masks = masks[np.newaxis, :, :]
+    # masks should be Z x Ly x Lx
+    if masks.shape[0] != parent.NZ:
+        print("ERROR: masks are not same depth (number of planes) as image stack")
+        return
+
+    _masks_to_gui(parent, masks, outlines)
+    if parent.ncells > 0:
+        parent.draw_layer()
+        parent.toggle_mask_ops()
+    del masks
+    gc.collect()
+    parent.update_layer()
+    parent.update_plot()
+
+
+def _load_zarr_masks(parent, filename=None):
+    """ load zeros-based masks (0=no cell, 1=cell 1, ...) """
+    print(f"GUI_INFO: loading masks: {filename}")
+    masks = zarr.load(filename)
     outlines = None
     if masks.ndim > 3:
         # Z x nchannels x Ly x Lx
