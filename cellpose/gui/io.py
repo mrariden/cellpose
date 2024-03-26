@@ -142,14 +142,15 @@ def _load_image(parent, filename=None, load_seg=True, load_3D=False):
 
 def _load_image_zarr(parent, filename=None, load_seg=True, load_3D=False):
     # TODO: fix this. it is hacked together and I have no idea if it is robust
+
     if filename is None:
         # zarr needs to open what looks like a directory:
         filename = QFileDialog.getExistingDirectory(parent, "Load image")
-    load_mask = False
     try:
         print(f"GUI_INFO: loading image: {filename}")
         image = zarr.load(filename)
         parent.loaded = True
+        parent.zarr_path = filename
     except Exception as e:
         print("ERROR: images not compatible")
         print(f"ERROR: {e}")
@@ -162,7 +163,30 @@ def _load_image_zarr(parent, filename=None, load_seg=True, load_3D=False):
         parent.loaded = True
         parent.enable_buttons()
 
+def _save_image_zarr(parent):
+    """ Intended to work with a zarr file that has already been loaded.
+    The loaded zarr should be a tile """
+    if parent.zarr_path is None:
+        print("ERROR: no zarr path to save to")
+        return
+    # get the flow_fields and prob_maps in the zarr by going up one level and back down with the tile key:
+    # this is a hack and I don't know if it is robust
 
+    # zarr_path is ex) original_images/CG8_Merged.zarr/tiles/tile_x0_y0
+    # we want to save to original_images/CG8_Merged.zarr/flow_fileds/tile_x0_y0
+    # and original_images/CG8_Merged.zarr/prob_maps/tile_x0_y0
+    zarr_path = parent.zarr_path
+    prob_maps_path = zarr_path.replace("tiles", "prob_maps")
+    flow_fields_path = zarr_path.replace("tiles", "flow_fields")
+
+    # Get the flow_fields and prob_maps
+    # TODO: why does parent.flows[0][0, ..., 2] exist? What's in the third channel?
+    flows = parent.flows[0][0, ..., 0:2]
+    probs = parent.flows[1][0, ...]
+
+    print(f"GUI_INFO: saving cellpose IR to zarr: {parent.zarr_path}")
+    zarr.save(prob_maps_path, probs)
+    zarr.save(flow_fields_path, flows)
 
 def _initialize_images(parent, image, load_3D=False):
     """ format image for GUI """

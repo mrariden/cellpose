@@ -228,6 +228,7 @@ class MainW(QMainWindow):
                            border: black solid 1px
                            }"""
         self.loaded = False
+        self.zarr_path = None
 
         # ---- MAIN WIDGET LAYOUT ---- #
         self.cwidget = QWidget(self)

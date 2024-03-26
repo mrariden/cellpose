@@ -23,6 +23,10 @@ def mainmenu(parent):
     loadZarr.triggered.connect(lambda: io._load_image_zarr(parent))
     file_menu.addAction(loadZarr)
 
+    save_zarr = QAction("&Save image as zarr", parent)
+    save_zarr.triggered.connect(lambda: io._save_image_zarr(parent))
+    file_menu.addAction(save_zarr)
+
     parent.autoloadMasks = QAction("Autoload masks from _masks.tif file", parent,
                                    checkable=True)
     parent.autoloadMasks.setChecked(False)
