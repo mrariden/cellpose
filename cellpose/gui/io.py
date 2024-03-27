@@ -215,13 +215,19 @@ def _save_image_zarr(parent):
 
     # Get the flow_fields and prob_maps
     # TODO: why does parent.flows[0][0, ..., 2] exist? What's in the third channel?
+    # flows will not be present if the model was not run
+    if len(parent.flows[0]) == 0:
+        print("GUI_INFO: model not re-run, saving only masks")
+        zarr.save(mask_path, parent.cellpix[0, ...])
+        return
+
     flows = parent.flows[0][0, ..., 0:2]
     probs = parent.flows[1][0, ...]
 
     print(f"GUI_INFO: saving cellpose IR to zarr: {parent.zarr_path}")
     zarr.save(prob_maps_path, probs)
     zarr.save(flow_fields_path, flows)
-    zarr.save(mask_path, parent.cellpix)
+    zarr.save(mask_path, parent.cellpix[0, ...])
 
 def _initialize_images(parent, image, load_3D=False):
     """ format image for GUI """
