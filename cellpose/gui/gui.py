@@ -229,6 +229,7 @@ class MainW(QMainWindow):
                            }"""
         self.loaded = False
         self.zarr_path = None
+        self.zarr_tile = None
 
         # ---- MAIN WIDGET LAYOUT ---- #
         self.cwidget = QWidget(self)
@@ -1119,10 +1120,18 @@ class MainW(QMainWindow):
         idx = np.nonzero(np.array(fnames) == f0)[0][0]
         return images, idx
 
+    def get_files_zarr(self):
+        mask_dir = os.path.join(self.zarr_path, 'masks')
+        mask_files = os.listdir(mask_dir)
+        mask_names = [os.path.split(mask_files[k])[-1] for k in range(len(mask_files))]
+        this_mask = self.zarr_tile
+        idx = np.nonzero(np.array(mask_names) == this_mask)[0][0]
+        return mask_files, idx
+
     def get_zarr_tile_list(self):
         # get list of tiles from zarr
         # zarr_path is like original_images/CG8_Merged.zarr/flow_fields/tile_x0_y0 and need to get the dir up 2 levels
-        zarr_tiles_dir = os.path.split(self.zarr_path)[0]
+        zarr_tiles_dir = os.path.join(self.zarr_path, 'tiles')
         zarr_tile_list = os.listdir(zarr_tiles_dir)
         zarr_tile_list = [t for t in zarr_tile_list if t.startswith("tile_")]
         zarr_tile_list.sort()
@@ -1132,15 +1141,15 @@ class MainW(QMainWindow):
         if self.zarr_path:
             # assume zarr is loaded and get next tile
             # file tiles, sort the list, and then get the next tile
-            this_tile = os.path.split(self.zarr_path)[-1]
             zarr_tiles = self.get_zarr_tile_list()
-            idx = zarr_tiles.index(this_tile)
-            if idx == 0:
-                next_tile = self.zarr_path.replace(this_tile, zarr_tiles[-1])
-            else:
-                next_tile = self.zarr_path.replace(this_tile, zarr_tiles[idx - 1])
-            self.zarr_path = next_tile
-            io._load_image_zarr(self, filename=next_tile)
+            idx = zarr_tiles.index(self.zarr_tile)
+
+            # get next tile
+            next_tile = zarr_tiles[(idx - 1) % len(zarr_tiles)]
+            next_tile_full_path = os.path.join(self.zarr_path, 'tiles', next_tile)
+            self.zarr_tile = next_tile
+
+            io._load_image_zarr(self, filename=next_tile_full_path)
             return
 
         images, idx = self.get_files()
@@ -1151,15 +1160,21 @@ class MainW(QMainWindow):
         if self.zarr_path:
             # assume zarr is loaded and get next tile
             # file tiles, sort the list, and then get the next tile
-            this_tile = os.path.split(self.zarr_path)[-1]
+            # this_tile = os.path.split(self.zarr_path)[-1]
             zarr_tiles = self.get_zarr_tile_list()
-            idx = zarr_tiles.index(this_tile)
-            if idx == len(zarr_tiles) - 1:
-                next_tile = self.zarr_path.replace(this_tile, zarr_tiles[0])
-            else:
-                next_tile = self.zarr_path.replace(this_tile, zarr_tiles[idx + 1])
-            self.zarr_path = next_tile
-            io._load_image_zarr(self, filename=next_tile)
+            idx = zarr_tiles.index(self.zarr_tile)
+
+            # get next tile
+            next_tile = zarr_tiles[(idx + 1) % len(zarr_tiles)]
+            next_tile_full_path = os.path.join(self.zarr_path, 'tiles', next_tile)
+            self.zarr_tile = next_tile
+
+            # if idx == len(zarr_tiles) - 1:
+            #     next_tile = self.full_zarr_path.replace(this_tile, zarr_tiles[0])
+            # else:
+            #     next_tile = self.full_zarr_path.replace(this_tile, zarr_tiles[idx + 1])
+            # self.zarr_path = next_tile
+            io._load_image_zarr(self, filename=next_tile_full_path)
             return
 
         images, idx = self.get_files()
@@ -1396,6 +1411,7 @@ class MainW(QMainWindow):
 
     def remove_single_cell(self, idx):
         # remove from manual array
+        # TODO: removal of cell for zarr
         self.selected = 0
         if self.NZ > 1:
             zextent = ((self.cellpix == idx).sum(axis=(1, 2)) > 0).nonzero()[0]
@@ -2177,9 +2193,18 @@ class MainW(QMainWindow):
             return
 
         # train model
-        image_names = self.get_files()[0]
-        self.train_data, self.train_labels, self.train_files, restore, normalize_params = io._get_train_set(
-            image_names)
+        if self.zarr_path:
+            image_names = self.get_files_zarr()[0]
+        else:
+            image_names = self.get_files()[0]
+
+        if self.zarr_path:
+            self.train_data, self.train_labels, self.train_files, restore, normalize_params = io._get_train_set_zarr(
+                self.zarr_path, image_names)
+        else:
+            self.train_data, self.train_labels, self.train_files, restore, normalize_params = io._get_train_set(
+                image_names)
+
         TW = guiparts.TrainWindow(self, models.MODEL_NAMES)
         train = TW.exec_()
         if train:

@@ -102,6 +102,21 @@ def _get_train_set(image_names):
         print(f"GUI_INFO: using {restore} images (dat['img_restore'])")
     return train_data, train_labels, train_files, restore, normalize_params
 
+def _get_train_set_zarr(zarr_path, image_names):
+    """ get training data and labels for tiles in zarr """
+    train_data, train_labels, train_files = [], [], []
+    restore = None  # TODO: what is this
+    normalize_params = normalize_default
+    for image_name in image_names:
+        image_full_path = os.path.join(zarr_path, 'tiles', image_name)
+        mask_full_path = os.path.join(zarr_path, 'masks', image_name)
+        data = zarr.load(image_full_path)
+        masks = zarr.load(mask_full_path)
+
+        train_files.append(image_full_path)
+        train_data.append(data)
+        train_labels.append(masks)
+    return train_data, train_labels, train_files, restore, normalize_params
 
 def _load_image(parent, filename=None, load_seg=True, load_3D=False):
     """ load image with filename; if None, open QFileDialog """
@@ -160,13 +175,6 @@ def _load_seg_zarr(parent, filename=None, load_seg=False, load_3D=False):
     if os.path.isdir(manual_file) and load_seg:
         _load_zarr_masks(parent, manual_file)
 
-    # if parent.loaded:
-    #     parent.reset()
-    #     parent.filename = filename
-    #     _initialize_images(parent, image, load_3D=False)
-    #     parent.loaded = True
-    #     parent.enable_buttons()
-
 
 def _load_image_zarr(parent, filename=None, load_seg=True, load_3D=False):
     # TODO: fix this. it is hacked together and I have no idea if it is robust
@@ -178,12 +186,19 @@ def _load_image_zarr(parent, filename=None, load_seg=True, load_3D=False):
 
     if filename is None:
         # zarr needs to open what looks like a directory:
-        filename = QFileDialog.getExistingDirectory(parent, "Load image")
+        filename = QFileDialog.getExistingDirectory(parent, "Load zarr tile")
     try:
         print(f"GUI_INFO: loading image: {filename}")
         image = zarr.load(filename)
         parent.loaded = True
-        parent.zarr_path = filename
+
+        # parent.zarr_path = filename
+
+        # get the zarr path which is 2 dirs up from filename
+        parent.zarr_path = os.path.split(os.path.split(filename)[0])[0]
+        # the zarr tile is the last part of the filename
+        parent.zarr_tile = os.path.split(filename)[1]
+
     except Exception as e:
         print("ERROR: images not compatible")
         print(f"ERROR: {e}")
@@ -208,10 +223,9 @@ def _save_image_zarr(parent):
     # zarr_path is ex) original_images/CG8_Merged.zarr/tiles/tile_x0_y0
     # we want to save to original_images/CG8_Merged.zarr/flow_fileds/tile_x0_y0
     # and original_images/CG8_Merged.zarr/prob_maps/tile_x0_y0
-    zarr_path = parent.zarr_path
-    prob_maps_path = zarr_path.replace("tiles", "prob_maps")
-    flow_fields_path = zarr_path.replace("tiles", "flow_fields")
-    mask_path = zarr_path.replace("tiles", "masks")
+    prob_maps_path = os.path.join(parent.zarr_path, "prob_maps", parent.zarr_tile)
+    flow_fields_path = os.path.join(parent.zarr_path, "flow_fields", parent.zarr_tile)
+    mask_path = os.path.join(parent.zarr_path, "masks", parent.zarr_tile)
 
     # Get the flow_fields and prob_maps
     # TODO: why does parent.flows[0][0, ..., 2] exist? What's in the third channel?
