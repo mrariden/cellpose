@@ -30,7 +30,7 @@ def process_image_to_zarr(large_image_path, tile_size=1120, overlap=10, zarr_mod
     """
     
     large_image = io.imread(large_image_path)
-    large_image = np.transpose(large_image, (2, 1, 0))
+    large_image = np.transpose(large_image, (2, 0, 1))
     large_image = normalize_img(large_image)
     C, W, H = large_image.shape
     
@@ -81,5 +81,5 @@ def process_image_to_zarr(large_image_path, tile_size=1120, overlap=10, zarr_mod
 
 if __name__ == '__main__':
     img_file = sys.argv[1] 
-    img_file_zarr_fp = process_image_to_zarr(img_file)
+    img_file_zarr_fp = process_image_to_zarr(img_file, tile_size=588, overlap=30)
 
