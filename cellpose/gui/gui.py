@@ -1127,6 +1127,7 @@ class MainW(QMainWindow):
         this_mask = self.zarr_tile
         idx = np.nonzero(np.array(mask_names) == this_mask)[0][0]
         return mask_files, idx
+        return mask_files
 
     def get_zarr_tile_list(self):
         # get list of tiles from zarr
