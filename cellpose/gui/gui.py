@@ -1123,10 +1123,7 @@ class MainW(QMainWindow):
     def get_files_zarr(self):
         mask_dir = os.path.join(self.zarr_path, 'masks')
         mask_files = os.listdir(mask_dir)
-        mask_names = [os.path.split(mask_files[k])[-1] for k in range(len(mask_files))]
-        this_mask = self.zarr_tile
-        idx = np.nonzero(np.array(mask_names) == this_mask)[0][0]
-        return mask_files, idx
+        return mask_files
 
     def get_zarr_tile_list(self):
         # get list of tiles from zarr
@@ -2194,7 +2191,7 @@ class MainW(QMainWindow):
 
         # train model
         if self.zarr_path:
-            image_names = self.get_files_zarr()[0]
+            image_names = self.get_files_zarr()
         else:
             image_names = self.get_files()[0]
 
