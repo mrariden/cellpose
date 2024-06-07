@@ -4,7 +4,8 @@ import numpy as np
 from cellpose.dynamics import compute_masks
 from skimage import io
 
-def reconstruct_image_from_zarr(zarr_fp, model_type='cyto'):
+
+def reconstruct_image_from_zarr(zarr_fp):
     # Load the Zarr store
     zarr_store = zarr.open(zarr_fp, mode='r')
 
@@ -22,9 +23,17 @@ def reconstruct_image_from_zarr(zarr_fp, model_type='cyto'):
 
     # Iterate over the tiles in the Zarr store
     for tile in zarr_store['flow_fields']:
+
+        # get the masks and find the flow field and prob map for the tile
+
+        # NOT this: ...
         # Load the tile
         flow_tile = zarr_store['flow_fields'][tile][:]
         prob_tile = zarr_store['prob_maps'][tile][:]
+
+        # permute the flow_tile if the channels are in the last dimension
+        if flow_tile.shape[2] == 2:
+            flow_tile = np.transpose(flow_tile, (2, 0, 1))
 
         # Calculate the position of the tile in the original image
         # The tile name is in the format 'tile_x{X}_y{Y}'
@@ -40,17 +49,24 @@ def reconstruct_image_from_zarr(zarr_fp, model_type='cyto'):
         # Update the count array
         count[x:x+flow_tile.shape[1], y:y+flow_tile.shape[2]] += 1
 
-    # Average the overlapping regions
+    # Average the overlapping regions, only divide by count where count is non-zero
+    count[count == 0] = 1
     flows /= count
     probs /= count
 
     # Run the mask reconstruction
-    masks = compute_masks(flows, probs)
+    masks, _ = compute_masks(flows, probs)
 
-    return masks, flows
+    return masks, flows, probs
 
 if __name__ == '__main__':
     zarr_fp = '/media/willow/BigBoi/ivan_imgs/original_images/CG8_Merged.zarr'
-    masks, flows = reconstruct_image_from_zarr(zarr_fp)
+    masks, flows, probs = reconstruct_image_from_zarr(zarr_fp)
+
+    # save masks, flows, and probs to the zarr store
+    zarr_store = zarr.open(zarr_fp, mode='a')
+    zarr_store['stitched_masks'] = masks
+    zarr_store['stitched_flows'] = flows
+    zarr_store['stitched_probs'] = probs
+
     io.imsave('masks.tif', masks)
-    io.imsave('flows.tif', flows)
