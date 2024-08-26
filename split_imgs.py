@@ -12,7 +12,10 @@ from get_image_file_resolution import get_resolution
 
 def extract_tile(image, start_x, start_y, width, height):
     # Function to extract a tile given starting x, y coordinates
-    return image[:, start_x:start_x+width, start_y:start_y+height]
+    # Ensure that the slicing does not go out of bounds
+    end_x = min(start_x + width, image.shape[1])
+    end_y = min(start_y + height, image.shape[0])
+    return image[start_x:end_x, start_y:end_y]
 
 def process_image_to_zarr(large_image_path, tile_size=1120, overlap=10, zarr_mode='w', skip_intensity_threshold=0.05):
     """
@@ -28,11 +31,10 @@ def process_image_to_zarr(large_image_path, tile_size=1120, overlap=10, zarr_mod
     Returns:
     - A pathlib.Path to the created Zarr store.
     """
-    
+
     large_image = io.imread(large_image_path)
-    large_image = np.transpose(large_image, (2, 0, 1))
     large_image = normalize_img(large_image)
-    C, W, H = large_image.shape
+    H, W, C = large_image.shape
     
     assert C < W and C < H, f"Image read incorrectly, channel ({C=}) axis larger than height ({H=}) or width ({W=}) axis"
 
@@ -57,6 +59,10 @@ def process_image_to_zarr(large_image_path, tile_size=1120, overlap=10, zarr_mod
                 current_tile_height = min(tile_size, H - y)
 
                 tile = extract_tile(large_image, x, y, current_tile_width, current_tile_height)
+                
+                if tile.size == 0:
+                    pbar.update(1)
+                    continue
 
                 tile_path = f'tiles/tile_x{x_i}_y{y_i}'
                 flow_field_path = f'flow_fields/tile_x{x_i}_y{y_i}'
@@ -81,5 +87,5 @@ def process_image_to_zarr(large_image_path, tile_size=1120, overlap=10, zarr_mod
 
 if __name__ == '__main__':
     img_file = sys.argv[1] 
-    img_file_zarr_fp = process_image_to_zarr(img_file, tile_size=588, overlap=30)
+    img_file_zarr_fp = process_image_to_zarr(img_file, tile_size=1000, overlap=100)
 
