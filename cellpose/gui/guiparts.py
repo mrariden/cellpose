@@ -672,8 +672,12 @@ class ImageDraw(pg.ImageItem):
                         elif self.parent.masksOn and not self.parent.deleting_multiple:
                             self.parent.unselect_cell()
 
+    def mouseDoubleClickEvent(self, ev) -> None:
+        ev.accept()
+        return
+
     def mouseDragEvent(self, ev):
-        ev.ignore()
+        ev.accept()
         return
 
     def hoverEvent(self, ev):
