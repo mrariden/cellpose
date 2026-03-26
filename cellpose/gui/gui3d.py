@@ -653,6 +653,11 @@ class MainW_3d(MainW):
                     self.brush_choose()
                 if not updated:
                     self.update_plot()
+
+            # when in stroke, allow escaping out of drawing
+            else: 
+                if event.key() == QtCore.Qt.Key_Escape:
+                    self.layer.end_stroke(keep_stroke=False)
         if event.key() == QtCore.Qt.Key_Minus or event.key() == QtCore.Qt.Key_Equal:
             self.p0.keyPressEvent(event)
 
