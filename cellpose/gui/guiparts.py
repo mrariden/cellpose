@@ -722,8 +722,17 @@ class ImageDraw(pg.ImageItem):
             else:
                 return False
 
-    def end_stroke(self):
+    def end_stroke(self, keep_stroke=True):
         self.parent.p0.removeItem(self.scatter)
+        if not keep_stroke:
+            if not self.parent.stroke_appended:
+                self.parent.strokes.append(self.parent.current_stroke)
+                self.parent.stroke_appended = True
+            self.parent.remove_stroke(delete_points=False)
+            self.parent.current_stroke = []
+            self.parent.current_point_set = []
+            self.parent.in_stroke = False
+            return
         if not self.parent.stroke_appended:
             self.parent.strokes.append(self.parent.current_stroke)
             self.parent.stroke_appended = True
