@@ -708,6 +708,9 @@ class ImageDraw(pg.ImageItem):
         # first check if you ever left the start
         if len(self.parent.current_stroke) > 3:
             stroke = np.array(self.parent.current_stroke)
+            stroke = stroke[stroke[:, 0] == self.parent.currentZ]
+            if len(stroke) <= 3:
+                return False
             dist = (((stroke[1:, 1:] -
                       stroke[:1, 1:][np.newaxis, :, :])**2).sum(axis=-1))**0.5
             dist = dist.flatten()
@@ -729,8 +732,8 @@ class ImageDraw(pg.ImageItem):
                 self.parent.strokes.append(self.parent.current_stroke)
                 self.parent.stroke_appended = True
             self.parent.remove_stroke(delete_points=False)
-            self.parent.current_stroke = []
-            self.parent.current_point_set = []
+            self.parent.current_stroke = [s for s in self.parent.current_stroke
+                                          if s[0] != self.parent.currentZ]
             self.parent.in_stroke = False
             return
         if not self.parent.stroke_appended:
