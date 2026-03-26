@@ -677,7 +677,10 @@ class ImageDraw(pg.ImageItem):
         return
 
     def mouseDragEvent(self, ev):
-        ev.accept()
+        if ev.button() == QtCore.Qt.RightButton:
+            ev.accept()
+        else:
+            ev.ignore()
         return
 
     def hoverEvent(self, ev):
