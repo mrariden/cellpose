@@ -328,7 +328,7 @@ class MainW(QMainWindow):
         self.l0.addWidget(self.satBox, b, 0, 1, 9)
 
         widget_row = 0
-        self.view = 0  # 0=image, 1=flowsXY, 2=flowsZ, 3=cellprob
+        # self.view = 0  # 0=image, 1=flowsXY, 2=flowsZ, 3=cellprob
         self.color = 0  # 0=RGB, 1=gray, 2=R, 3=G, 4=B
         self.RGBDropDown = QComboBox()
         self.RGBDropDown.addItems(
@@ -350,6 +350,7 @@ class MainW(QMainWindow):
         self.ViewDropDown.setFont(self.medfont)
         self.ViewDropDown.model().item(3).setEnabled(False)
         self.ViewDropDown.currentIndexChanged.connect(self.update_plot)
+        self.view = 0 # must reference the property after the dropdown is created
         self.satBoxG.addWidget(self.ViewDropDown, widget_row, 0, 2, 3)
 
         label = QLabel("[pageup / pagedown]")
@@ -686,11 +687,9 @@ class MainW(QMainWindow):
                     ) == QtCore.Qt.Key_D:
                         self.get_next_image()
                     elif event.key() == QtCore.Qt.Key_PageDown:
-                        self.view = (self.view + 1) % (nviews)
-                        self.ViewDropDown.setCurrentIndex(self.view)
+                        self.go_next_previous_view()
                     elif event.key() == QtCore.Qt.Key_PageUp:
-                        self.view = (self.view - 1) % (nviews)
-                        self.ViewDropDown.setCurrentIndex(self.view)
+                        self.go_next_previous_view(-1)
 
                 # can change background or stroke size if cell not finished
                 if event.key() == QtCore.Qt.Key_Up or event.key() == QtCore.Qt.Key_W:
@@ -982,7 +981,6 @@ class MainW(QMainWindow):
         # -- set menus to default -- #
         self.color = 0
         self.RGBDropDown.setCurrentIndex(self.color)
-        self.view = 0
         self.ViewDropDown.setCurrentIndex(0)
         self.ViewDropDown.model().item(self.ViewDropDown.count() - 1).setEnabled(False)
         self.delete_restore()
@@ -997,6 +995,36 @@ class MainW(QMainWindow):
         self.removing_cells_list = []
         self.removing_region = False
         self.remove_roi_obj = None
+
+    @property
+    def view(self):
+        """Current view mode as a string (e.g. 'image', 'gradXY', 'cellprob', 'restored')."""
+        return self.ViewDropDown.currentText()
+
+    @view.setter
+    def view(self, value: int|str):
+        """Set the active view in the ViewDropDown.
+
+        Parameters
+        ----------
+        value : int or str
+            If int, sets the dropdown to that index. If str, matches against
+            available items ('image', 'gradXY', 'cellprob', 'restored') and
+            selects the matching entry.
+
+        Raises
+        ------
+        ValueError
+            If value is neither an int nor a str.
+        """
+        if isinstance(value, int):
+            self.ViewDropDown.setCurrentIndex(value)
+        elif isinstance(value, str):
+            items = [self.ViewDropDown.itemText(i) for i in range(self.ViewDropDown.count())]
+            if value in items: 
+                self.ViewDropDown.setCurrentIndex(items.index(value))
+        else: 
+            raise ValueError('Incompatible view drop down setting')
 
     def delete_restore(self):
         """ delete restored imgs but don't reset settings """
@@ -1342,17 +1370,27 @@ class MainW(QMainWindow):
 
     def color_choose(self):
         self.color = self.RGBDropDown.currentIndex()
-        self.view = 0
-        self.ViewDropDown.setCurrentIndex(self.view)
+        self.view = 'image'
         self.update_plot()
 
     def update_plot(self):
         self.view = self.ViewDropDown.currentIndex()
         self.Ly, self.Lx, _ = self.stack[self.currentZ].shape
 
-        if self.view == 0 or self.view == self.ViewDropDown.count() - 1:
-            image = self.stack[
-                self.currentZ] if self.view == 0 else self.stack_filtered[self.currentZ]
+        is_image_view = self.view == 'image'
+        is_restored_view = self.view == 'restored'
+
+        flowp_map = {
+            'gradXY' : 0,
+            'cellprob' : 1,
+            'gradZ' : 4,
+        }
+
+        if is_image_view or is_restored_view:
+            if is_image_view:
+                image = self.stack[self.currentZ]
+            else: 
+                self.stack_filtered[self.currentZ]
             if self.color == 0:
                 self.img.setImage(image, autoLevels=False, lut=None)
                 if self.nchan > 1:
@@ -1388,12 +1426,9 @@ class MainW(QMainWindow):
                 self.img.setLevels(self.saturation[0][self.currentZ])
         else:
             image = np.zeros((self.Ly, self.Lx), np.uint8)
-            if len(self.flows) >= self.view - 1 and len(self.flows[self.view - 1]) > 0:
-                image = self.flows[self.view - 1][self.currentZ]
-            if self.view > 1:
-                self.img.setImage(image, autoLevels=False, lut=self.bwr)
-            else:
-                self.img.setImage(image, autoLevels=False, lut=None)
+            if len(self.flows[flowp_map[self.view]]) > 0:
+                image = self.flows[flowp_map[self.view]][self.currentZ]
+            self.img.setImage(image, autoLevels=False, lut=self.bwr)
             self.img.setLevels([0.0, 255.0])
 
         for r in range(3):
@@ -1946,10 +1981,11 @@ class MainW(QMainWindow):
             flows_new.append(flows[0].copy())  # RGB flow
             flows_new.append((np.clip(normalize99(flows[2].copy()), 0, 1) *
                               255).astype("uint8"))  # cellprob
-            flows_new.append(flows[1].copy()) # XY flows
+            flows_new.append(flows[1].copy()) # XY(Z) flows
             flows_new.append(flows[2].copy()) # original cellprob
 
             if self.load_3D:
+                # append Z flows (or zeros in stitching case): Z flows are flows[4]
                 if stitch_threshold == 0.:
                     flows_new.append((flows[1][0] / 10 * 127 + 127).astype("uint8"))
                 else:
@@ -1972,8 +2008,7 @@ class MainW(QMainWindow):
                 Lz, Ly, Lx = self.NZ, self.Ly, self.Lx
                 Lz0, Ly0, Lx0 = flows_new[0].shape[:3]
                 print("GUI_INFO: resizing flows to original image size")
-                for j in range(len(flows_new)):
-                    flow0 = flows_new[j]
+                for flows0 in flows_new:
                     if Ly0 != Ly:
                         flow0 = resize_image(flow0, Ly=Ly, Lx=Lx,
                                             no_channels=flow0.ndim==3, 
@@ -2009,3 +2044,28 @@ class MainW(QMainWindow):
                 self.recompute_masks = False
         except Exception as e:
             print("ERROR: %s" % e)
+
+
+    def go_next_previous_view(self, increment=1):
+        """ Go to the next view using `increment` """
+
+        # skip disabled views
+        num_items = self.ViewDropDown.count()
+        enabled = []
+        for i in range(num_items):
+            enabled.append(self.ViewDropDown.model().item(i).isEnabled())
+
+        if not any(enabled):
+            self.logger.error('No available views are enabled. Cannot adjust view.')
+            return 
+
+        idx = self.ViewDropDown.currentIndex() + increment
+
+        for _ in range(num_items):
+            idx %= num_items
+            if enabled[idx]:
+                self.ViewDropDown.setCurrentIndex(idx)
+                return
+            idx += increment
+
+        self.logger.error('Could not find an emabled view.')

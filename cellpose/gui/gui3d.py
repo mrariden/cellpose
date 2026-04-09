@@ -445,10 +445,14 @@ class MainW_3d(MainW):
                     zmin, zmax = z - self.dz, z + self.dz
             self.zc = z - zmin
             self.update_crosshairs()
-            if self.view == 0 or self.view == 4:
+
+            is_image_view = self.view == 'image'
+            is_restored_view = self.view == 'restored'
+
+            if is_image_view or is_restored_view:
                 for j in range(2):
                     if j == 0:
-                        if self.view == 0:
+                        if is_image_view:
                             image = self.stack[zmin:zmax, :, x].transpose(1, 0, 2).copy()
                         else:
                             image = self.stack_filtered[zmin:zmax, :,
@@ -456,7 +460,7 @@ class MainW_3d(MainW):
                     else:
                         image = self.stack[
                             zmin:zmax,
-                            y, :].copy() if self.view == 0 else self.stack_filtered[zmin:zmax,
+                            y, :].copy() if is_image_view else self.stack_filtered[zmin:zmax,
                                                                              y, :].copy()
                     if self.nchan == 1:
                         # show single channel
@@ -613,11 +617,9 @@ class MainW_3d(MainW):
                         self.scroll.setValue(self.currentZ)
                         updated = True
                     elif event.key() == QtCore.Qt.Key_PageDown:
-                        self.view = (self.view + 1) % (nviews)
-                        self.ViewDropDown.setCurrentIndex(self.view)
+                        self.go_next_previous_view()
                     elif event.key() == QtCore.Qt.Key_PageUp:
-                        self.view = (self.view - 1) % (nviews)
-                        self.ViewDropDown.setCurrentIndex(self.view)
+                        self.go_next_previous_view(-1)
 
                 # can change background or stroke size if cell not finished
                 if event.key() == QtCore.Qt.Key_Up or event.key() == QtCore.Qt.Key_W:
