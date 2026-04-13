@@ -1425,7 +1425,7 @@ class MainW(QMainWindow):
         flowp_map = {
             'gradXY' : 0,
             'cellprob' : 1,
-            'gradZ' : 4,
+            'gradZ' : 2,
         }
         rgb_list = ['red', 'green', 'blue']
 
