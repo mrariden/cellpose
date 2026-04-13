@@ -167,7 +167,7 @@ def _initialize_images(parent, image, load_3D=False):
     load_3D = parent.load_3D if load_3D is False else load_3D
 
     parent.stack = image
-    print(f"GUI_INFO: image shape: {image.shape}")
+    parent.logger.info(f" : image shape: {image.shape}")
     if load_3D:
         parent.NZ = len(parent.stack)
         parent.scroll.setMaximum(parent.NZ - 1)
@@ -208,17 +208,8 @@ def _initialize_images(parent, image, load_3D=False):
 
     if parent.autobtn.isChecked():
         if parent.restore is None or parent.restore != "filter":
-            print(
-                "GUI_INFO: normalization checked: computing saturation levels (and optionally filtered image)"
-            )
+            parent.logger.info(": normalization checked: computing saturation levels (and optionally filtered image)")
             parent.compute_saturation()
-    # elif len(parent.saturation) != parent.NZ:
-    #     parent.saturation = []
-    #     for r in range(3):
-    #         parent.saturation.append([])
-    #         for n in range(parent.NZ):
-    #             parent.saturation[-1].append([0, 255])
-    #         parent.sliders[r].setValue([0, 255])
     parent.compute_scale()
     parent.track_changes = []
 
