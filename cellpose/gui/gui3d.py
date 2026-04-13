@@ -449,6 +449,8 @@ class MainW_3d(MainW):
             is_image_view = self.view == 'image'
             is_restored_view = self.view == 'restored'
 
+            rgb_list = ['red', 'green', 'blue']
+
             if is_image_view or is_restored_view:
                 for j in range(2):
                     if j == 0:
@@ -477,18 +479,19 @@ class MainW_3d(MainW):
                         else:
                             self.imgOrtho[j].setLevels(
                                 self.saturation[0][self.currentZ])
-                    elif self.color > 0 and self.color < 4:
+                    elif self.color in rgb_list:
+                        color_index = rgb_list.index(self.color)
                         if self.nchan > 1:
-                            image = image[..., self.color - 1]
+                            image = image[..., color_index]
                         self.imgOrtho[j].setImage(image, autoLevels=False,
-                                                  lut=self.cmap[self.color])
+                                                  lut=self.cmap[color_index + 1])
                         if self.nchan > 1:
                             self.imgOrtho[j].setLevels(
-                                self.saturation[self.color - 1][self.currentZ])
+                                self.saturation[color_index][self.currentZ])
                         else:
                             self.imgOrtho[j].setLevels(
                                 self.saturation[0][self.currentZ])
-                    elif self.color == 4:
+                    elif self.color == 'gray':
                         if image.ndim > 2:
                             # exclude blank channels: 
                             ranges = np.ptp(image, tuple(range(image.ndim-1)))
@@ -497,7 +500,7 @@ class MainW_3d(MainW):
                             image = image.astype("float32").mean(axis=2).astype("uint8")
                         self.imgOrtho[j].setImage(image, autoLevels=False, lut=None)
                         self.imgOrtho[j].setLevels(self.saturation[0][self.currentZ])
-                    elif self.color == 5:
+                    elif self.color == 'spectral':
                         if image.ndim > 2:
                             image = image.astype("float32").mean(axis=2).astype("uint8")
                         self.imgOrtho[j].setImage(image, autoLevels=False,
