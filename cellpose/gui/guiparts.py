@@ -724,7 +724,7 @@ class ImageDraw(pg.ImageItem):
                 return False
 
     def end_stroke(self):
-        if self.scatter is not None:
+        if hasattr(self, 'scatter') and self.scatter is not None:
             if self.scatter.scene() == self.parent.layer.scene():
                 self.parent.p0.removeItem(self.scatter)
         if not self.parent.stroke_appended:
