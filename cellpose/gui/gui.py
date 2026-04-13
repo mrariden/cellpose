@@ -688,8 +688,10 @@ class MainW(QMainWindow):
                         self.get_next_image()
                     elif event.key() == QtCore.Qt.Key_PageDown:
                         self.go_next_previous_view()
+                        updated = True
                     elif event.key() == QtCore.Qt.Key_PageUp:
                         self.go_next_previous_view(-1)
+                        updated = True
 
                 # can change background or stroke size if cell not finished
                 if event.key() == QtCore.Qt.Key_Up or event.key() == QtCore.Qt.Key_W:
