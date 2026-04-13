@@ -467,7 +467,7 @@ class MainW_3d(MainW):
                     if self.nchan == 1:
                         # show single channel
                         image = image[..., 0]
-                    if self.color == 0:
+                    if self.color == 'rgb':
                         self.imgOrtho[j].setImage(image, autoLevels=False, lut=None)
                         if self.nchan > 1:
                             levels = np.array([

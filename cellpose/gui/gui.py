@@ -1017,13 +1017,42 @@ class MainW(QMainWindow):
 
     @property
     def color(self):
-        """ Current color mode as a string. Possible values are rgb, red, green, blue, gray, or spectral"""
+        """Current color display mode as a lowercase string.
+
+        Reflects the current selection of the RGBDropDown widget. Possible
+        values are ``'rgb'``, ``'red'``, ``'green'``, ``'blue'``, ``'gray'``,
+        and ``'spectral'``.
+
+        Returns
+        -------
+        str
+            The current color mode, always lowercase.
+        """
         # invert mapping
-        inv_name_map = {v: k for k, v in self.RGBDropDown.name_map.items()} 
+        inv_name_map = {v: k for k, v in self.RGBDropDown.name_map.items()}
         return inv_name_map[self.RGBDropDown.currentText().lower()].lower()
-    
+
     @color.setter
     def color(self, value: str|int):
+        """Set the color display mode by name or dropdown index.
+
+        Updates the RGBDropDown widget, which triggers any connected signals
+        (e.g. ``update_plot``).
+
+        Parameters
+        ----------
+        value : str or int
+            If ``str``, a case-insensitive color name (``'rgb'``, ``'red'``,
+            ``'green'``, ``'blue'``, ``'gray'``, ``'spectral'``). The name is
+            looked up via ``RGBDropDown.name_map`` before matching against the
+            dropdown items, so aliases defined in that map are also accepted.
+            If ``int``, the zero-based index of the desired dropdown item.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is neither a ``str`` nor an ``int``.
+        """
         if isinstance(value, int):
             self.RGBDropDown.setCurrentIndex(value)
         elif isinstance(value, str):
@@ -1031,7 +1060,7 @@ class MainW(QMainWindow):
             items = [self.RGBDropDown.itemText(i).lower() for i in range(self.RGBDropDown.count())]
             if value in items:
                 self.RGBDropDown.setCurrentIndex(items.index(value))
-        else: 
+        else:
             raise ValueError('Imcompatible color drop down setting')
 
     @property
