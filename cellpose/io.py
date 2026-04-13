@@ -99,7 +99,6 @@ def logger_setup(cp_path=".cellpose", logfile_name="run.log", stdout_file_replac
 
     stdout_fh.setFormatter(formatter)
     stdout_fh.setLevel(logging.INFO)
-    stdout_fh.addFilter(lambda r: r if 'gui' in r.name else None)
     logger.addHandler(stdout_fh)
 
     logger.propagate = False
