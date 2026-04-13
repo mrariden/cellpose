@@ -153,9 +153,7 @@ def _load_image(parent, filename=None, load_seg=True, load_3D=False):
 
     # check if gray and adjust viewer:
     if len(np.unique(image[..., 1:])) == 1:
-        parent.color = 4
-        parent.RGBDropDown.setCurrentIndex(4) # gray
-        parent.update_plot()
+        parent.color = 'gray'
 
         
 def _initialize_images(parent, image, load_3D=False):
@@ -389,7 +387,6 @@ def _load_masks(parent, filename=None):
     del masks
     gc.collect()
     parent.update_layer()
-    parent.update_plot()
 
 
 def _masks_to_gui(parent, masks, outlines=None, colors=None):

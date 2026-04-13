@@ -811,8 +811,6 @@ class MainW(QMainWindow):
             self.sliders[n].setEnabled(True)
 
         self.toggle_mask_ops()
-
-        self.update_plot()
         self.setWindowTitle(self.filename)
 
     def disable_buttons_removeROIs(self):
