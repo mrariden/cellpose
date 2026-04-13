@@ -328,14 +328,24 @@ class MainW(QMainWindow):
         self.l0.addWidget(self.satBox, b, 0, 1, 9)
 
         widget_row = 0
-        # self.view = 0  # 0=image, 1=flowsXY, 2=flowsZ, 3=cellprob
-        self.color = 0  # 0=RGB, 1=gray, 2=R, 3=G, 4=B
         self.RGBDropDown = QComboBox()
+
+        # This is duplication and in the future these things should be tied 
+        # together in a class: 
         self.RGBDropDown.addItems(
             ["RGB", "red=R", "green=G", "blue=B", "gray", "spectral"])
+        self.RGBDropDown.name_map = {
+            "rgb" : "rgb",
+            "red" : "red=r", 
+            "green" : "green=g", 
+            "blue" : "blue=b", 
+            "gray" : "gray", 
+            "spectral": "spectral",
+        }
         self.RGBDropDown.setFont(self.medfont)
         self.RGBDropDown.currentIndexChanged.connect(self.color_choose)
         self.satBoxG.addWidget(self.RGBDropDown, widget_row, 0, 1, 3)
+        self.color = 'RGB'  # 0=RGB, 1=gray, 2=R, 3=G, 4=B
 
         label = QLabel("<p>[&uarr; / &darr; or W/S]</p>")
         label.setFont(self.smallfont)
@@ -663,62 +673,75 @@ class MainW(QMainWindow):
             self.update_plot()
 
     def keyPressEvent(self, event):
+        event.ignore()
         if self.loaded:
             if not (event.modifiers() &
                     (QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier |
                      QtCore.Qt.AltModifier) or self.in_stroke):
-                updated = False
                 if len(self.current_point_set) > 0:
                     if event.key() == QtCore.Qt.Key_Return:
                         self.add_set()
+                        event.accept()
+                        return
                 else:
-                    nviews = self.ViewDropDown.count() - 1
-                    nviews += int(
-                        self.ViewDropDown.model().item(self.ViewDropDown.count() -
-                                                       1).isEnabled())
                     if event.key() == QtCore.Qt.Key_X:
                         self.MCheckBox.toggle()
+                        event.accept()
+                        return
                     if event.key() == QtCore.Qt.Key_Z:
                         self.OCheckBox.toggle()
+                        event.accept()
+                        return
                     if event.key() == QtCore.Qt.Key_Left or event.key(
                     ) == QtCore.Qt.Key_A:
                         self.get_prev_image()
+                        event.accept()
+                        return
                     elif event.key() == QtCore.Qt.Key_Right or event.key(
                     ) == QtCore.Qt.Key_D:
                         self.get_next_image()
+                        event.accept()
+                        return
                     elif event.key() == QtCore.Qt.Key_PageDown:
-                        self.go_next_previous_view()
-                        updated = True
+                        self.go_next_previous_dropdown(self.ViewDropDown)
+                        event.accept()
+                        return
                     elif event.key() == QtCore.Qt.Key_PageUp:
-                        self.go_next_previous_view(-1)
-                        updated = True
+                        self.go_next_previous_dropdown(self.ViewDropDown, -1)
+                        event.accept()
+                        return
 
                 # can change background or stroke size if cell not finished
                 if event.key() == QtCore.Qt.Key_Up or event.key() == QtCore.Qt.Key_W:
-                    self.color = (self.color - 1) % (6)
-                    self.RGBDropDown.setCurrentIndex(self.color)
+                    self.go_next_previous_dropdown(self.RGBDropDown, -1)
+                    event.accept()
+                    return
                 elif event.key() == QtCore.Qt.Key_Down or event.key(
                 ) == QtCore.Qt.Key_S:
-                    self.color = (self.color + 1) % (6)
-                    self.RGBDropDown.setCurrentIndex(self.color)
+                    self.go_next_previous_dropdown(self.RGBDropDown, 1)
+                    event.accept()
+                    return
                 elif event.key() == QtCore.Qt.Key_R:
-                    if self.color != 1:
-                        self.color = 1
+                    if self.color != 'red':
+                        self.color = 'red'
                     else:
-                        self.color = 0
-                    self.RGBDropDown.setCurrentIndex(self.color)
+                        self.color = 'rgb'
+                    event.accept()
+                    return
                 elif event.key() == QtCore.Qt.Key_G:
-                    if self.color != 2:
-                        self.color = 2
+                    if self.color != 'green':
+                        self.color = 'green'
                     else:
-                        self.color = 0
-                    self.RGBDropDown.setCurrentIndex(self.color)
+                        self.color = 'rgb'
+                    event.accept()
+                    return
                 elif event.key() == QtCore.Qt.Key_B:
-                    if self.color != 3:
-                        self.color = 3
+                    if self.color != 'blue':
+                        self.color = 'blue'
                     else:
-                        self.color = 0
-                    self.RGBDropDown.setCurrentIndex(self.color)
+                        self.color = 'rgb'
+                    event.accept()
+                    return
                 elif (event.key() == QtCore.Qt.Key_Comma or
                       event.key() == QtCore.Qt.Key_Period):
                     count = self.BrushChoose.count()
@@ -729,8 +752,6 @@ class MainW(QMainWindow):
                         gci = min(count - 1, gci + 1)
                     self.BrushChoose.setCurrentIndex(gci)
                     self.brush_choose()
-                if not updated:
-                    self.update_plot()
         if event.key() == QtCore.Qt.Key_Minus or event.key() == QtCore.Qt.Key_Equal:
             self.p0.keyPressEvent(event)
 
@@ -981,10 +1002,8 @@ class MainW(QMainWindow):
         self.ismanual = np.zeros(0, "bool")
 
         # -- set menus to default -- #
-        self.color = 0
-        self.RGBDropDown.setCurrentIndex(self.color)
-        self.ViewDropDown.setCurrentIndex(0)
-        self.ViewDropDown.model().item(self.ViewDropDown.count() - 1).setEnabled(False)
+        self.color = 'RGB'
+        self.view = 'image'
         self.delete_restore()
 
         self.clear_all()
@@ -997,6 +1016,25 @@ class MainW(QMainWindow):
         self.removing_cells_list = []
         self.removing_region = False
         self.remove_roi_obj = None
+
+    @property
+    def color(self):
+        """ Current color mode as a string. Possible values are rgb, red, green, blue, gray, or spectral"""
+        # invert mapping
+        inv_name_map = {v: k for k, v in self.RGBDropDown.name_map.items()} 
+        return inv_name_map[self.RGBDropDown.currentText().lower()].lower()
+    
+    @color.setter
+    def color(self, value: str|int):
+        if isinstance(value, int):
+            self.RGBDropDown.setCurrentIndex(value)
+        elif isinstance(value, str):
+            value = self.RGBDropDown.name_map[value.lower()]
+            items = [self.RGBDropDown.itemText(i).lower() for i in range(self.RGBDropDown.count())]
+            if value in items:
+                self.RGBDropDown.setCurrentIndex(items.index(value))
+        else: 
+            raise ValueError('Imcompatible color drop down setting')
 
     @property
     def view(self):
@@ -1027,6 +1065,11 @@ class MainW(QMainWindow):
                 self.ViewDropDown.setCurrentIndex(items.index(value))
         else: 
             raise ValueError('Incompatible view drop down setting')
+        
+    def enable_restored_view(self, enable: bool):
+        items = [self.ViewDropDown.itemText(i) for i in range(self.ViewDropDown.count())]
+        self.ViewDropDown.model().item(items.index('restored')).setEnabled(enable)
+
 
     def delete_restore(self):
         """ delete restored imgs but don't reset settings """
@@ -1041,9 +1084,9 @@ class MainW(QMainWindow):
     def clear_restore(self):
         """ delete restored imgs and reset settings """
         print("GUI_INFO: clearing restored image")
-        self.ViewDropDown.model().item(self.ViewDropDown.count() - 1).setEnabled(False)
-        if self.ViewDropDown.currentIndex() == self.ViewDropDown.count() - 1:
-            self.ViewDropDown.setCurrentIndex(0)
+        self.enable_restored_view(False)
+        if self.view == 'restored': 
+            self.view = 'image'
         self.delete_restore()
         self.restore = None
         self.ratio = 1.
@@ -1371,12 +1414,11 @@ class MainW(QMainWindow):
         items = self.win.scene().items(pos)
 
     def color_choose(self):
-        self.color = self.RGBDropDown.currentIndex()
         self.view = 'image'
         self.update_plot()
 
     def update_plot(self):
-        self.view = self.ViewDropDown.currentIndex()
+
         self.Ly, self.Lx, _ = self.stack[self.currentZ].shape
 
         is_image_view = self.view == 'image'
@@ -1387,13 +1429,14 @@ class MainW(QMainWindow):
             'cellprob' : 1,
             'gradZ' : 4,
         }
+        rgb_list = ['red', 'green', 'blue']
 
         if is_image_view or is_restored_view:
             if is_image_view:
                 image = self.stack[self.currentZ]
             else: 
-                self.stack_filtered[self.currentZ]
-            if self.color == 0:
+                image = self.stack_filtered[self.currentZ]
+            if self.color == 'rgb':
                 self.img.setImage(image, autoLevels=False, lut=None)
                 if self.nchan > 1:
                     levels = np.array([
@@ -1404,15 +1447,16 @@ class MainW(QMainWindow):
                     self.img.setLevels(levels)
                 else:
                     self.img.setLevels(self.saturation[0][self.currentZ])
-            elif self.color > 0 and self.color < 4:
+            elif self.color in rgb_list:
+                color_index = rgb_list.index(self.color)
                 if self.nchan > 1:
-                    image = image[:, :, self.color - 1]
-                self.img.setImage(image, autoLevels=False, lut=self.cmap[self.color])
+                    image = image[:, :, color_index]
+                self.img.setImage(image, autoLevels=False, lut=self.cmap[color_index+1])
                 if self.nchan > 1:
-                    self.img.setLevels(self.saturation[self.color - 1][self.currentZ])
+                    self.img.setLevels(self.saturation[color_index][self.currentZ])
                 else:
                     self.img.setLevels(self.saturation[0][self.currentZ])
-            elif self.color == 4:
+            elif self.color == 'gray':
                 if self.nchan > 1:
                     # exclude channels with no data:
                     ranges = np.ptp(image, tuple(range(image.ndim-1)))
@@ -1421,7 +1465,7 @@ class MainW(QMainWindow):
                     image = image.mean(axis=-1)
                 self.img.setImage(image, autoLevels=False, lut=None)
                 self.img.setLevels(self.saturation[0][self.currentZ])
-            elif self.color == 5:
+            elif self.color == 'spectral':
                 if self.nchan > 1:
                     image = image.mean(axis=-1)
                 self.img.setImage(image, autoLevels=False, lut=self.cmap[0])
@@ -1752,9 +1796,8 @@ class MainW(QMainWindow):
                     img_norm[..., c] /= (img_norm_max - img_norm_min)
             img_norm *= 255
             self.stack_filtered = img_norm
-            self.ViewDropDown.model().item(self.ViewDropDown.count() -
-                                           1).setEnabled(True)
-            self.ViewDropDown.setCurrentIndex(self.ViewDropDown.count() - 1)
+            self.enable_restored_view(True)
+            self.view = 'restored'
         else:
             img_norm = self.stack if self.restore is None or self.restore == "filter" else self.stack_filtered
 
@@ -2048,26 +2091,26 @@ class MainW(QMainWindow):
             print("ERROR: %s" % e)
 
 
-    def go_next_previous_view(self, increment=1):
-        """ Go to the next view using `increment` """
+    def go_next_previous_dropdown(self, dropdown, increment=1):
+        """ Go to the next dropdown element using `increment` """
 
         # skip disabled views
-        num_items = self.ViewDropDown.count()
+        num_items = dropdown.count()
         enabled = []
         for i in range(num_items):
-            enabled.append(self.ViewDropDown.model().item(i).isEnabled())
+            enabled.append(dropdown.model().item(i).isEnabled())
 
         if not any(enabled):
-            self.logger.error('No available views are enabled. Cannot adjust view.')
+            self.logger.error('No available dropdown items are enabled. Cannot adjust view.')
             return 
 
-        idx = self.ViewDropDown.currentIndex() + increment
+        idx = dropdown.currentIndex() + increment
 
         for _ in range(num_items):
             idx %= num_items
             if enabled[idx]:
-                self.ViewDropDown.setCurrentIndex(idx)
+                dropdown.setCurrentIndex(idx)
                 return
             idx += increment
 
-        self.logger.error('Could not find an emabled view.')
+        self.logger.error('Could not find an emabled dropdown item.')
