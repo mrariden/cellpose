@@ -323,7 +323,6 @@ def _load_seg(parent, filename=None, image=None, image_file=None, load_3D=False)
 
     if "current_channel" in dat:
         parent.color = (dat["current_channel"] + 2) % 5
-        parent.RGBDropDown.setCurrentIndex(parent.color)
 
     if "flows" in dat:
         parent.flows = dat["flows"]

@@ -1454,7 +1454,7 @@ class MainW(QMainWindow):
         flowp_map = {
             'gradXY' : 0,
             'cellprob' : 1,
-            'gradZ' : 2,
+            'gradZ' : 4,
         }
         rgb_list = ['red', 'green', 'blue']
 
@@ -2082,15 +2082,15 @@ class MainW(QMainWindow):
                 print("GUI_INFO: resizing flows to original image size")
                 for flows0 in flows_new:
                     if Ly0 != Ly:
-                        flow0 = resize_image(flow0, Ly=Ly, Lx=Lx,
-                                            no_channels=flow0.ndim==3, 
+                        flows0 = resize_image(flows0, Ly=Ly, Lx=Lx,
+                                            no_channels=flows0.ndim==3, 
                                             interpolation=cv2.INTER_NEAREST)
                     if Lz0 != Lz:
-                        flow0 = np.swapaxes(resize_image(np.swapaxes(flow0, 0, 1),
+                        flows0 = np.swapaxes(resize_image(np.swapaxes(flows0, 0, 1),
                                             Ly=Lz, Lx=Lx,
-                                            no_channels=flow0.ndim==3, 
+                                            no_channels=flows0.ndim==3, 
                                             interpolation=cv2.INTER_NEAREST), 0, 1)
-                    self.flows.append(flow0)
+                    self.flows.append(flows0)
 
             # add first axis
             if self.NZ == 1:
