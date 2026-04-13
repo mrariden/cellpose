@@ -202,23 +202,13 @@ def _initialize_images(parent, image, load_3D=False):
         parent.Lyr, parent.Lxr = parent.Ly, parent.Lx
     parent.clear_all()
 
-    if not hasattr(parent, "stack_filtered") and parent.restore:
-        print("GUI_INFO: no 'img_restore' found, applying current settings")
-        parent.compute_restore()
-
     if parent.autobtn.isChecked():
         if parent.restore is None or parent.restore != "filter":
             print(
                 "GUI_INFO: normalization checked: computing saturation levels (and optionally filtered image)"
             )
             parent.compute_saturation()
-    # elif len(parent.saturation) != parent.NZ:
-    #     parent.saturation = []
-    #     for r in range(3):
-    #         parent.saturation.append([])
-    #         for n in range(parent.NZ):
-    #             parent.saturation[-1].append([0, 255])
-    #         parent.sliders[r].setValue([0, 255])
+
     parent.compute_scale()
     parent.track_changes = []
 
