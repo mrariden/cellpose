@@ -583,87 +583,93 @@ class MainW_3d(MainW):
         self.show()
 
     def keyPressEvent(self, event):
+        event.ignore()
         if self.loaded:
             if not (event.modifiers() &
                     (QtCore.Qt.ControlModifier | QtCore.Qt.ShiftModifier |
                      QtCore.Qt.AltModifier) or self.in_stroke):
-                updated = False
                 if len(self.current_point_set) > 0:
                     if event.key() == QtCore.Qt.Key_Return:
                         self.add_set()
+                        event.accept()
+                        return
                     if self.NZ > 1:
                         if event.key() == QtCore.Qt.Key_Left:
                             self.currentZ = max(0, self.currentZ - 1)
                             self.scroll.setValue(self.currentZ)
-                            updated = True
+                            event.accept()
+                            return
                         elif event.key() == QtCore.Qt.Key_Right:
                             self.currentZ = min(self.NZ - 1, self.currentZ + 1)
                             self.scroll.setValue(self.currentZ)
-                            updated = True
+                            event.accept()
+                            return
                 else:
-                    nviews = self.ViewDropDown.count() - 1
-                    nviews += int(
-                        self.ViewDropDown.model().item(self.ViewDropDown.count() -
-                                                       1).isEnabled())
-                    if event.key() == QtCore.Qt.Key_X:
-                        self.MCheckBox.toggle()
-                    if event.key() == QtCore.Qt.Key_Z:
-                        self.OCheckBox.toggle()
+                    # nviews = self.ViewDropDown.count() - 1
+                    # nviews += int(
+                    #     self.ViewDropDown.model().item(self.ViewDropDown.count() -
+                    #                                    1).isEnabled())
+                    # if event.key() == QtCore.Qt.Key_X:
+                    #     self.MCheckBox.toggle()
+                    # if event.key() == QtCore.Qt.Key_Z:
+                    #     self.OCheckBox.toggle()
                     if event.key() == QtCore.Qt.Key_Left or event.key(
                     ) == QtCore.Qt.Key_A:
                         self.currentZ = max(0, self.currentZ - 1)
                         self.scroll.setValue(self.currentZ)
-                        updated = True
+                        event.accept()
                     elif event.key() == QtCore.Qt.Key_Right or event.key(
                     ) == QtCore.Qt.Key_D:
                         self.currentZ = min(self.NZ - 1, self.currentZ + 1)
                         self.scroll.setValue(self.currentZ)
-                        updated = True
-                    elif event.key() == QtCore.Qt.Key_PageDown:
-                        self.go_next_previous_view()
-                    elif event.key() == QtCore.Qt.Key_PageUp:
-                        self.go_next_previous_view(-1)
+                        event.accept()
+                    # elif event.key() == QtCore.Qt.Key_PageDown:
+                    #     self.go_next_previous_view()
+                    # elif event.key() == QtCore.Qt.Key_PageUp:
+                    #     self.go_next_previous_view(-1)
 
                 # can change background or stroke size if cell not finished
-                if event.key() == QtCore.Qt.Key_Up or event.key() == QtCore.Qt.Key_W:
-                    self.color = (self.color - 1) % (6)
-                    self.RGBDropDown.setCurrentIndex(self.color)
-                elif event.key() == QtCore.Qt.Key_Down or event.key(
-                ) == QtCore.Qt.Key_S:
-                    self.color = (self.color + 1) % (6)
-                    self.RGBDropDown.setCurrentIndex(self.color)
-                elif event.key() == QtCore.Qt.Key_R:
-                    if self.color != 1:
-                        self.color = 1
-                    else:
-                        self.color = 0
-                    self.RGBDropDown.setCurrentIndex(self.color)
-                elif event.key() == QtCore.Qt.Key_G:
-                    if self.color != 2:
-                        self.color = 2
-                    else:
-                        self.color = 0
-                    self.RGBDropDown.setCurrentIndex(self.color)
-                elif event.key() == QtCore.Qt.Key_B:
-                    if self.color != 3:
-                        self.color = 3
-                    else:
-                        self.color = 0
-                    self.RGBDropDown.setCurrentIndex(self.color)
-                elif (event.key() == QtCore.Qt.Key_Comma or
-                      event.key() == QtCore.Qt.Key_Period):
-                    count = self.BrushChoose.count()
-                    gci = self.BrushChoose.currentIndex()
-                    if event.key() == QtCore.Qt.Key_Comma:
-                        gci = max(0, gci - 1)
-                    else:
-                        gci = min(count - 1, gci + 1)
-                    self.BrushChoose.setCurrentIndex(gci)
-                    self.brush_choose()
-                if not updated:
-                    self.update_plot()
+                # if event.key() == QtCore.Qt.Key_Up or event.key() == QtCore.Qt.Key_W:
+                #     self.color = (self.color - 1) % (6)
+                #     self.RGBDropDown.setCurrentIndex(self.color)
+                # elif event.key() == QtCore.Qt.Key_Down or event.key(
+                # ) == QtCore.Qt.Key_S:
+                #     self.color = (self.color + 1) % (6)
+                #     self.RGBDropDown.setCurrentIndex(self.color)
+                # elif event.key() == QtCore.Qt.Key_R:
+                #     if self.color != 1:
+                #         self.color = 1
+                #     else:
+                #         self.color = 0
+                #     self.RGBDropDown.setCurrentIndex(self.color)
+                # elif event.key() == QtCore.Qt.Key_G:
+                #     if self.color != 2:
+                #         self.color = 2
+                #     else:
+                #         self.color = 0
+                #     self.RGBDropDown.setCurrentIndex(self.color)
+                # elif event.key() == QtCore.Qt.Key_B:
+                #     if self.color != 3:
+                #         self.color = 3
+                #     else:
+                #         self.color = 0
+                #     self.RGBDropDown.setCurrentIndex(self.color)
+                # elif (event.key() == QtCore.Qt.Key_Comma or
+                #       event.key() == QtCore.Qt.Key_Period):
+                #     count = self.BrushChoose.count()
+                #     gci = self.BrushChoose.currentIndex()
+                #     if event.key() == QtCore.Qt.Key_Comma:
+                #         gci = max(0, gci - 1)
+                #     else:
+                #         gci = min(count - 1, gci + 1)
+                #     self.BrushChoose.setCurrentIndex(gci)
+                #     self.brush_choose()
         if event.key() == QtCore.Qt.Key_Minus or event.key() == QtCore.Qt.Key_Equal:
             self.p0.keyPressEvent(event)
+
+        # propagate unhandled events to MainW                                                                                   
+        if not event.isAccepted():
+            super().keyPressEvent(event)   
 
     def update_ztext(self):
         zpos = self.currentZ
