@@ -31,15 +31,6 @@ except:
 
 Horizontal = QtCore.Qt.Orientation.Horizontal
 
-from contextlib import contextmanager
-
-@contextmanager
-def suppress_signals(widget):
-    widget.blockSignals(True)
-    try:
-        yield
-    finally:
-        widget.blockSignals(False)
 
 class Slider(QRangeSlider):
 
@@ -1008,9 +999,9 @@ class MainW(QMainWindow):
         self.ismanual = np.zeros(0, "bool")
 
         # -- set menus to default -- #
-        with suppress_signals(self.RGBDropDown):
+        with QtCore.QSignalBlocker(self.RGBDropDown):
             self.color = 'RGB'
-        with suppress_signals(self.ViewDropDown):
+        with QtCore.QSignalBlocker(self.ViewDropDown):
             self.view = 'image'
         self.delete_restore()
 
@@ -1517,7 +1508,7 @@ class MainW(QMainWindow):
         for r in range(3):
         # setValue on the slider triggers update_plot() so it needs to be suppressed
             slider = self.sliders[r]
-            with suppress_signals(slider):
+            with QtCore.QSignalBlocker(slider):
                 slider.setValue([
                     self.saturation[r][self.currentZ][0],
                     self.saturation[r][self.currentZ][1]
