@@ -208,6 +208,10 @@ class MainW_3d(MainW):
         self.l0.addWidget(self.orthobtn, b, 0, 1, 2)
         self.orthobtn.toggled.connect(self.toggle_ortho)
 
+        # connect the ortho masks and outlines: 
+        self.MCheckBox.toggled.connect(self.update_ortho)
+        self.OCheckBox.toggled.connect(self.update_ortho)
+
         label = QLabel("dz:")
         label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         label.setFont(self.medfont)
