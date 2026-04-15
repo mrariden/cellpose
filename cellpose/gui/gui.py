@@ -1506,7 +1506,7 @@ class MainW(QMainWindow):
             self.img.setLevels([0.0, 255.0])
 
         for r in range(3):
-        # setValue on the slider triggers update_plot() so it needs to be suppressed
+            # setValue on the slider triggers update_plot() so it needs to be suppressed
             slider = self.sliders[r]
             with QtCore.QSignalBlocker(slider):
                 slider.setValue([
@@ -1867,7 +1867,6 @@ class MainW(QMainWindow):
             if img_norm.shape[-1] == 1:
                 self.saturation.append(self.saturation[0])
                 self.saturation.append(self.saturation[0])
-
 
 
     def get_model_path(self, custom=False):
