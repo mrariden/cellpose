@@ -31,6 +31,15 @@ except:
 
 Horizontal = QtCore.Qt.Orientation.Horizontal
 
+from contextlib import contextmanager
+
+@contextmanager
+def suppress_signals(widget):
+    widget.blockSignals(True)
+    try:
+        yield
+    finally:
+        widget.blockSignals(False)
 
 class Slider(QRangeSlider):
 
@@ -933,7 +942,6 @@ class MainW(QMainWindow):
             self.draw_layer()
             self.update_layer()
         if self.loaded:
-            self.update_plot()
             self.update_layer()
 
     def make_viewbox(self):
@@ -1000,8 +1008,10 @@ class MainW(QMainWindow):
         self.ismanual = np.zeros(0, "bool")
 
         # -- set menus to default -- #
-        self.color = 'RGB'
-        self.view = 'image'
+        with suppress_signals(self.RGBDropDown):
+            self.color = 'RGB'
+        with suppress_signals(self.ViewDropDown):
+            self.view = 'image'
         self.delete_restore()
 
         self.clear_all()
@@ -1505,10 +1515,13 @@ class MainW(QMainWindow):
             self.img.setLevels([0.0, 255.0])
 
         for r in range(3):
-            self.sliders[r].setValue([
-                self.saturation[r][self.currentZ][0],
-                self.saturation[r][self.currentZ][1]
-            ])
+        # setValue on the slider triggers update_plot() so it needs to be suppressed
+            slider = self.sliders[r]
+            with suppress_signals(slider):
+                slider.setValue([
+                    self.saturation[r][self.currentZ][0],
+                    self.saturation[r][self.currentZ][1]
+                ])
         self.win.show()
         self.show()
 
@@ -1864,8 +1877,6 @@ class MainW(QMainWindow):
                 self.saturation.append(self.saturation[0])
                 self.saturation.append(self.saturation[0])
 
-        # self.autobtn.setChecked(True)
-        self.update_plot()
 
 
     def get_model_path(self, custom=False):

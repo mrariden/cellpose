@@ -121,7 +121,11 @@ def _load_image(parent, filename=None, load_seg=True, load_3D=False):
             else:
                 image = None
             _load_seg(parent, manual_file, image=image, image_file=filename,
-                      load_3D=load_3D)
+                        load_3D=load_3D)
+            if len(np.unique(image[..., 1:])) == 1:
+                parent.color = 'gray' # updates the plot automatically
+            else:
+                parent.update_plot()
             return
         elif parent.autoloadMasks.isChecked():
             mask_file = os.path.splitext(filename)[0] + "_masks" + os.path.splitext(
@@ -153,9 +157,10 @@ def _load_image(parent, filename=None, load_seg=True, load_3D=False):
 
     # check if gray and adjust viewer:
     if len(np.unique(image[..., 1:])) == 1:
-        parent.color = 'gray'
+        parent.color = 'gray' # triggers update_plot
+    else:
+        parent.update_plot()
 
-        
 def _initialize_images(parent, image, load_3D=False):
     """ format image for GUI
 
