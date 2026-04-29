@@ -48,7 +48,7 @@ def _add_model(parent, filename=None, load_model=True):
         parent.model_choose(custom=True)
 
 
-def _remove_model(parent, ind=None, verbose=True):
+def _remove_model(parent, ind=None):
     if ind is None:
         ind = parent.ModelChooseC.currentIndex()
     if ind > 0:
