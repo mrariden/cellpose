@@ -52,11 +52,9 @@ def _remove_model(parent, ind=None, verbose=True):
     if ind is None:
         ind = parent.ModelChooseC.currentIndex()
     if ind > 0:
-        ind -= 1
-        parent.ModelChooseC.removeItem(ind + 1)
-        del parent.model_strings[ind]
-        # remove model from txt path
         modelstr = parent.ModelChooseC.currentText()
+        parent.ModelChooseC.removeItem(ind)
+        # remove model from txt path
         remove_model(modelstr)
         if len(parent.model_strings) > 0:
             parent.ModelChooseC.setCurrentIndex(len(parent.model_strings))

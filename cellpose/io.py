@@ -336,6 +336,10 @@ def remove_model(filename, delete=False):
     filename = os.path.split(filename)[-1]
     from . import models
     model_strings = models.get_user_models()
+    try:
+        model_strings.remove(filename)
+    except ValueError as err:
+        raise ValueError(f'filename not found: {filename}')
     if len(model_strings) > 0:
         with open(models.MODEL_LIST_PATH, "w") as textfile:
             for fname in model_strings:
