@@ -752,8 +752,6 @@ class MainW(QMainWindow):
                         gci = min(count - 1, gci + 1)
                     self.BrushChoose.setCurrentIndex(gci)
                     self.brush_choose()
-                if not updated:
-                    self.update_plot()
             
             # when in stroke, allow escaping out of drawing
             else: 
