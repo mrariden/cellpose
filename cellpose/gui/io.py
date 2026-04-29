@@ -121,7 +121,11 @@ def _load_image(parent, filename=None, load_seg=True, load_3D=False):
             else:
                 image = None
             _load_seg(parent, manual_file, image=image, image_file=filename,
-                      load_3D=load_3D)
+                        load_3D=load_3D)
+            if len(np.unique(image[..., 1:])) == 1:
+                parent.color = 'gray' # updates the plot automatically
+            else:
+                parent.update_plot()
             return
         elif parent.autoloadMasks.isChecked():
             mask_file = os.path.splitext(filename)[0] + "_masks" + os.path.splitext(
@@ -153,11 +157,10 @@ def _load_image(parent, filename=None, load_seg=True, load_3D=False):
 
     # check if gray and adjust viewer:
     if len(np.unique(image[..., 1:])) == 1:
-        parent.color = 4
-        parent.RGBDropDown.setCurrentIndex(4) # gray
+        parent.color = 'gray' # triggers update_plot
+    else:
         parent.update_plot()
 
-        
 def _initialize_images(parent, image, load_3D=False):
     """ format image for GUI
 
@@ -210,6 +213,7 @@ def _initialize_images(parent, image, load_3D=False):
         if parent.restore is None or parent.restore != "filter":
             parent.logger.info(": normalization checked: computing saturation levels (and optionally filtered image)")
             parent.compute_saturation()
+    
     parent.compute_scale()
     parent.track_changes = []
 
@@ -326,7 +330,6 @@ def _load_seg(parent, filename=None, image=None, image_file=None, load_3D=False)
 
     if "current_channel" in dat:
         parent.color = (dat["current_channel"] + 2) % 5
-        parent.RGBDropDown.setCurrentIndex(parent.color)
 
     if "flows" in dat:
         parent.flows = dat["flows"]
@@ -390,7 +393,6 @@ def _load_masks(parent, filename=None):
     del masks
     gc.collect()
     parent.update_layer()
-    parent.update_plot()
 
 
 def _masks_to_gui(parent, masks, outlines=None, colors=None):
