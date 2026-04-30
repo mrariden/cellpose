@@ -170,7 +170,7 @@ def _initialize_images(parent, image, load_3D=False):
     load_3D = parent.load_3D if load_3D is False else load_3D
 
     parent.stack = image
-    print(f"GUI_INFO: image shape: {image.shape}")
+    parent.logger.info(f" : image shape: {image.shape}")
     if load_3D:
         parent.NZ = len(parent.stack)
         parent.scroll.setMaximum(parent.NZ - 1)
@@ -187,7 +187,7 @@ def _initialize_images(parent, image, load_3D=False):
     parent.stack *= 255
 
     if load_3D:
-        print("GUI_INFO: converted to float and normalized values to 0.0->255.0")
+        parent.logger.info(": converted to float and normalized values to 0.0->255.0")
 
     del image
     gc.collect()
@@ -205,13 +205,15 @@ def _initialize_images(parent, image, load_3D=False):
         parent.Lyr, parent.Lxr = parent.Ly, parent.Lx
     parent.clear_all()
 
+    if not hasattr(parent, "stack_filtered") and parent.restore:
+        parent.logger.info(": no 'img_restore' found, applying current settings")
+        parent.compute_restore()
+
     if parent.autobtn.isChecked():
         if parent.restore is None or parent.restore != "filter":
-            print(
-                "GUI_INFO: normalization checked: computing saturation levels (and optionally filtered image)"
-            )
+            parent.logger.info(": normalization checked: computing saturation levels (and optionally filtered image)")
             parent.compute_saturation()
-
+    
     parent.compute_scale()
     parent.track_changes = []
 
@@ -312,7 +314,7 @@ def _load_seg(parent, filename=None, image=None, image_file=None, load_3D=False)
 
         if "manual_changes" in dat:
             parent.track_changes = dat["manual_changes"]
-            print("GUI_INFO: loaded in previous changes")
+            parent.logger.info("loaded in previous changes")
         if "zdraw" in dat:
             parent.zdraw = dat["zdraw"]
         else:
@@ -398,7 +400,7 @@ def _masks_to_gui(parent, masks, outlines=None, colors=None):
     # get unique values
     shape = masks.shape
     if len(fastremap.unique(masks)) != masks.max() + 1:
-        print("GUI_INFO: renumbering masks")
+        parent.logger.info("renumbering masks")
         fastremap.renumber(masks, in_place=True)
         outlines = None
         masks = masks.reshape(shape)
@@ -423,7 +425,7 @@ def _masks_to_gui(parent, masks, outlines=None, colors=None):
             if parent.cellpix_orig.ndim == 2:
                 parent.cellpix_orig = parent.cellpix_orig[np.newaxis, :, :]
 
-    print(f"GUI_INFO: {masks.max()} masks found")
+    parent.logger.info(f"{masks.max()} masks found")
 
     # get outlines
     if outlines is None:  # parent.outlinesOn
@@ -437,7 +439,7 @@ def _masks_to_gui(parent, masks, outlines=None, colors=None):
                 outlines = masks_to_outlines(parent.cellpix_orig[z])
                 parent.outpix_orig[z] = outlines * parent.cellpix_orig[z]
             if z % 50 == 0 and parent.NZ > 1:
-                print("GUI_INFO: plane %d outlines processed" % z)
+                parent.logger.info("plane %d outlines processed" % z)
         if parent.restore and "upsample" in parent.restore:
             parent.outpix_resize = parent.outpix.copy()
     else:
@@ -449,7 +451,7 @@ def _masks_to_gui(parent, masks, outlines=None, colors=None):
                 outlines = masks_to_outlines(parent.cellpix_orig[z])
                 parent.outpix_orig[z] = outlines * parent.cellpix_orig[z]
                 if z % 50 == 0 and parent.NZ > 1:
-                    print("GUI_INFO: plane %d outlines processed" % z)
+                    parent.logger.info("plane %d outlines processed" % z)
 
     if parent.outpix.ndim == 2:
         parent.outpix = parent.outpix[np.newaxis, :, :]
@@ -461,7 +463,7 @@ def _masks_to_gui(parent, masks, outlines=None, colors=None):
 
     parent.ncells.set(parent.cellpix.max())
     colors = parent.colormap[:parent.ncells.get(), :3] if colors is None else colors
-    print("GUI_INFO: creating cellcolors and drawing masks")
+    parent.logger.info("creating cellcolors and drawing masks")
     parent.cellcolors = np.concatenate((np.array([[255, 255, 255]]), colors),
                                        axis=0).astype(np.uint8)
     if parent.ncells > 0:
@@ -483,13 +485,13 @@ def _save_png(parent):
     base = os.path.splitext(filename)[0]
     if parent.NZ == 1:
         if parent.cellpix[0].max() > 65534:
-            print("GUI_INFO: saving 2D masks to tif (too many masks for PNG)")
+            parent.logger.info("saving 2D masks to tif (too many masks for PNG)")
             imsave(base + "_cp_masks.tif", parent.cellpix[0])
         else:
-            print("GUI_INFO: saving 2D masks to png")
+            parent.logger.info("saving 2D masks to png")
             imsave(base + "_cp_masks.png", parent.cellpix[0].astype(np.uint16))
     else:
-        print("GUI_INFO: saving 3D masks to tiff")
+        parent.logger.info("saving 3D masks to tiff")
         imsave(base + "_cp_masks.tif", parent.cellpix)
 
 
@@ -497,14 +499,14 @@ def _save_flows(parent):
     """ save flows and cellprob to tiff """
     filename = parent.filename
     base = os.path.splitext(filename)[0]
-    print("GUI_INFO: saving flows and cellprob to tiff")
+    parent.logger.info("saving flows and cellprob to tiff")
     if len(parent.flows) > 0:
         imsave(base + "_cp_cellprob.tif", parent.flows[1])
         for i in range(3):
             imsave(base + f"_cp_flows_{i}.tif", parent.flows[0][..., i])
         if len(parent.flows) > 2:
             imsave(base + "_cp_flows.tif", parent.flows[2])
-        print("GUI_INFO: saved flows and cellprob")
+        parent.logger.info("saved flows and cellprob")
     else:
         print("ERROR: no flows or cellprob found")
 
@@ -620,7 +622,7 @@ def _save_sets(parent):
             dat["img_restore"] = parent.stack_filtered
     try:
         np.save(base + "_seg.npy", dat)
-        print("GUI_INFO: %d ROIs saved to %s" % (parent.ncells.get(), base + "_seg.npy"))
+        parent.logger.info("%d ROIs saved to %s" % (parent.ncells.get(), base + "_seg.npy"))
     except Exception as e:
         print(f"ERROR: {e}")
     del dat
