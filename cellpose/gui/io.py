@@ -331,8 +331,9 @@ def _load_seg(parent, filename=None, image=None, image_file=None, load_3D=False)
     if "current_channel" in dat:
         color = dat['current_channel']
 
-        # color updated to strings, force int channels to rgb for backwards compatibility
+        # old .npy files stored channel as int; default to 'rgb'
         if isinstance(color, int):
+            parent.logger.warning('ignoring `current_channel` key in .npy because it is int')
             parent.color = 'rgb'
         elif isinstance(color, str):
             parent.color = color
