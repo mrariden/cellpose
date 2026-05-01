@@ -329,7 +329,13 @@ def _load_seg(parent, filename=None, image=None, image_file=None, load_3D=False)
             parent.ismanual = dat["ismanual"]
 
     if "current_channel" in dat:
-        parent.color = (dat["current_channel"] + 2) % 5
+        color = dat['current_channel']
+
+        # color updated to strings, force int channels to rgb for backwards compatibility
+        if isinstance(color, int):
+            parent.color = 'rgb'
+        elif isinstance(color, str):
+            parent.color = color
 
     if "flows" in dat:
         parent.flows = dat["flows"]
@@ -559,7 +565,7 @@ def _save_sets(parent):
                 parent.cellcolors[1:],
             "masks":
                 parent.cellpix,
-            "current_channel": (parent.color - 2) % 5,
+            "current_channel": parent.color,
             "filename":
                 parent.filename,
             "flows":

@@ -1018,7 +1018,7 @@ class MainW(QMainWindow):
         self.remove_roi_obj = None
 
     @property
-    def color(self):
+    def color(self) -> str:
         """Current color display mode as a lowercase string.
 
         Reflects the current selection of the RGBDropDown widget. Possible
