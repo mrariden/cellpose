@@ -362,6 +362,7 @@ def _load_seg(parent, filename=None, image=None, image_file=None, load_3D=False)
 
     parent.enable_buttons()
     parent.update_layer()
+    parent.update_plot()
     del dat
     gc.collect()
 
