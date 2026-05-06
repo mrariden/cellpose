@@ -1319,9 +1319,9 @@ class MainW(QMainWindow):
                 if touching > 0:
                     mask = np.zeros((np.ptp(ar) + 4, np.ptp(ac) + 4), np.uint8)
                     mask[ar - ar.min() + 2, ac - ac.min() + 2] = 1
-                    contours = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                                cv2.CHAIN_APPROX_NONE)
-                    pvc, pvr = contours[-2][0].squeeze().T
+                    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                    contour = contours[np.argmax([c.size for c in contours])]
+                    pvc, pvr = contour.squeeze().T
                     vr, vc = pvr + ar.min() - 2, pvc + ac.min() - 2
 
                 else:
@@ -1575,8 +1575,9 @@ class MainW(QMainWindow):
             ar, ac = np.nonzero(mask)
             ar, ac = ar + vr.min() - 2, ac + vc.min() - 2
             # get dense outline
-            contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-            pvc, pvr = contours[-2][0][:,0].T
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            contour = contours[np.argmax([c.size for c in contours])]
+            pvc, pvr = contour[:,0].T
             vr, vc = pvr + vr.min() - 2, pvc + vc.min() - 2
             # concatenate all points
             ar, ac = np.hstack((np.vstack((vr, vc)), np.vstack((ar, ac))))
@@ -1590,9 +1591,9 @@ class MainW(QMainWindow):
                 # compute outline of new mask
                 mask = np.zeros((np.ptp(vr) + 4, np.ptp(vc) + 4), np.uint8)
                 mask[ar - vr.min() + 2, ac - vc.min() + 2] = 1
-                contours = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                            cv2.CHAIN_APPROX_NONE)
-                pvc, pvr = contours[-2][0][:,0].T
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                contour = contours[np.argmax([c.size for c in contours])]
+                pvc, pvr = contour[:,0].T
                 vr, vc = pvr + vr.min() - 2, pvc + vc.min() - 2
             ars = np.concatenate((ars, ar), axis=0)
             acs = np.concatenate((acs, ac), axis=0)
@@ -1641,9 +1642,9 @@ class MainW(QMainWindow):
                 arr, acr = np.nonzero(mask)
                 arr, acr = arr + vrr.min() - 2, acr + vcr.min() - 2
                 # get dense outline
-                contours = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                            cv2.CHAIN_APPROX_NONE)
-                pvc, pvr = contours[-2][0].squeeze().T
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                contour = contours[np.argmax([c.size for c in contours])]
+                pvc, pvr = contour.squeeze().T
                 vrr, vcr = pvr + vrr.min() - 2, pvc + vcr.min() - 2
                 # concatenate all points
                 arr, acr = np.hstack((np.vstack((vrr, vcr)), np.vstack((arr, acr))))
