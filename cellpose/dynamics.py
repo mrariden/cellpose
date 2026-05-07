@@ -2,8 +2,8 @@
 Copyright © 2025 Howard Hughes Medical Institute, Authored by Carsen Stringer , Michael Rariden and Marius Pachitariu.
 """
 import os
-from cellpose import transforms
 import cv2
+from cellpose import transforms
 from scipy.ndimage import find_objects, center_of_mass, mean
 import torch
 import numpy as np
@@ -20,8 +20,7 @@ from . import utils
 import torch
 import torch.nn.functional as F
 
-def _extend_centers_gpu(neighbors, meds, isneighbor, shape, n_iter=200,
-                        device=torch.device("cpu")):
+def _extend_centers_gpu(neighbors, meds, isneighbor, shape, n_iter=200, device=torch.device("cpu")):
     """Runs diffusion on GPU to generate flows for training images or quality control.
 
     Args:
@@ -33,7 +32,7 @@ def _extend_centers_gpu(neighbors, meds, isneighbor, shape, n_iter=200,
         device (torch.device, optional): Device to run on. Defaults to torch.device("cpu").
 
     Returns:
-        torch.Tensor: Generated flows.
+        np.ndarray: Generated flows.
     """
     if torch.prod(torch.tensor(shape)) > 4e7 or device.type == "mps":
         T = torch.zeros(shape, dtype=torch.float, device=device)
@@ -66,17 +65,16 @@ def _extend_centers_gpu(neighbors, meds, isneighbor, shape, n_iter=200,
         dy = grads[0] - grads[1]
         dx = grads[2] - grads[3]
         del grads
-        mu_torch = np.stack((dy.cpu().numpy(), dx.cpu().numpy()), axis=-2)
+        mu = np.stack((dy.cpu().numpy(), dx.cpu().numpy()), axis=0)
     else:
         grads = T_flat[flat_neighbors[1:]]          
         dz = grads[0] - grads[1]
         dy = grads[2] - grads[3]
         dx = grads[4] - grads[5]
         del grads
-        mu_torch = np.stack(
-            (dz.cpu().numpy(), dy.cpu().numpy(), dx.cpu().numpy()), axis=-2)
+        mu = np.stack((dz.cpu().numpy(), dy.cpu().numpy(), dx.cpu().numpy()), axis=0)
 
-    return mu_torch
+    return mu
 
 
 def center_of_mass(mask):
@@ -119,7 +117,7 @@ def masks_to_flows_gpu(masks, device=torch.device("cpu"), niter=None):
         meds_p are cell centers.
     """
     if device is None:
-        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('mps') if torch.backends.mps.is_available() else None
+        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('mps') if torch.backends.mps.is_available() else torch.device('cpu')   
 
     if masks.max() > 0:
         Ly0, Lx0 = masks.shape
@@ -171,12 +169,12 @@ def masks_to_flows_gpu(masks, device=torch.device("cpu"), niter=None):
 
     return mu0, slices
 
-def masks_to_flows_gpu_3d(masks, device=None, niter=None):
+def masks_to_flows_gpu_3d(masks, device=torch.device('cpu'), niter=None):
     """Convert masks to flows using diffusion from center pixel.
 
     Args:
         masks (int, 2D or 3D array): Labelled masks. 0=NO masks; 1,2,...=mask labels.
-        device (torch.device, optional): The device to run the computation on. Defaults to None.
+        device (torch.device, optional): The device to run the computation on. Defaults to torch.device('cpu').
         niter (int, optional): Number of iterations for the diffusion process. Defaults to None.
 
     Returns:
@@ -184,7 +182,7 @@ def masks_to_flows_gpu_3d(masks, device=None, niter=None):
         
     """
     if device is None:
-        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('mps') if torch.backends.mps.is_available() else None
+        device = torch.device('cuda') if torch.cuda.is_available() else torch.device('mps') if torch.backends.mps.is_available() else torch.device('cpu')
 
     Lz0, Ly0, Lx0 = masks.shape
     Lz, Ly, Lx = Lz0 + 2, Ly0 + 2, Lx0 + 2
@@ -203,7 +201,7 @@ def masks_to_flows_gpu_3d(masks, device=None, niter=None):
     # get mask centers
     slices = find_objects(masks)
 
-    centers = np.zeros((masks.max(), 3), "int")
+    centers = torch.zeros((masks.max(), 3), dtype=torch.int, device=device)
     for i, si in enumerate(slices):
         if si is not None:
             sz, sy, sx = si
