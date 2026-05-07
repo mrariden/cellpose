@@ -34,11 +34,10 @@ def _extend_centers_gpu(neighbors, meds, isneighbor, shape, n_iter=200, device=t
     Returns:
         np.ndarray: Generated flows.
     """
-    if torch.prod(torch.tensor(shape)) > 4e7 or device.type == "mps":
-        T = torch.zeros(shape, dtype=torch.float, device=device)
-    else:
-        T = torch.zeros(shape, dtype=torch.double, device=device)
-
+    
+    dtype = torch.float32 if torch.prod(torch.tensor(shape)) > 4e7 or device.type == "mps" else torch.float64
+    T_flat = torch.zeros(np.prod(shape), dtype=dtype, device=device)
+            
     ndim = len(shape)
     Ly, Lx = shape[-2:]
     # speed up with flattened inds
@@ -51,8 +50,7 @@ def _extend_centers_gpu(neighbors, meds, isneighbor, shape, n_iter=200, device=t
         flat_meds = (meds[:, 0] * (Ly * Lx) + meds[:, 1] * Lx + meds[:, 2]).long() 
         
     flat_center = flat_neighbors[0]
-    T_flat = T.view(-1)            
-
+    
     nneigh = flat_neighbors.shape[0]
     for i in range(n_iter):
         T_flat[flat_meds] += 1
