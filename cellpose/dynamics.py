@@ -2,6 +2,8 @@
 Copyright © 2025 Howard Hughes Medical Institute, Authored by Carsen Stringer , Michael Rariden and Marius Pachitariu.
 """
 import os
+from cellpose import transforms
+import cv2
 from scipy.ndimage import find_objects, center_of_mass, mean
 import torch
 import numpy as np
