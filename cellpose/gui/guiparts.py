@@ -1,12 +1,16 @@
 """
 Copyright © 2025 Howard Hughes Medical Institute, Authored by Carsen Stringer , Michael Rariden and Marius Pachitariu.
 """
+import logging
+import traceback
 from qtpy import QtGui, QtCore
 from qtpy.QtGui import QPixmap, QDoubleValidator
 from qtpy.QtWidgets import QWidget, QDialog, QGridLayout, QPushButton, QLabel, QLineEdit, QDialogButtonBox, QComboBox, QCheckBox, QVBoxLayout
 import pyqtgraph as pg
 import numpy as np
 import pathlib, os
+
+from cellpose.gui.io import _save_sets
 
 
 def stylesheet():
@@ -133,6 +137,16 @@ class DarkPalette(QtGui.QPalette):
 
 #     return ChannelChoose, ChannelLabels
 
+def unsilence_exceptions(func):
+    """ Wrapper to unsilence Qt exceptions and re-raise them """
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            logger = logging.getLogger(__name__)
+            logger.critical(f"Uncaught exception in {func.__name__}")
+            logger.debug(''.join(traceback.format_exception(type(e), e, e.__traceback__)))
+    return wrapper
 
 class ModelButton(QPushButton):
 
@@ -580,6 +594,7 @@ class ViewBoxNoRightDrag(pg.ViewBox):
         self.parent = parent
         self.axHistoryPointer = -1
 
+    @unsilence_exceptions
     def keyPressEvent(self, ev):
         """
         This routine should capture key presses in the current view box.
@@ -627,52 +642,56 @@ class ImageDraw(pg.ImageItem):
         self.parent.current_stroke = []
         self.parent.in_stroke = False
 
+    @unsilence_exceptions
     def mouseClickEvent(self, ev):
-        if (self.parent.masksOn or
-                self.parent.outlinesOn) and not self.parent.removing_region:
-            is_right_click = ev.button() == QtCore.Qt.RightButton
-            if self.parent.loaded \
-                    and (is_right_click or ev.modifiers() & QtCore.Qt.ShiftModifier and not ev.double())\
-                    and not self.parent.deleting_multiple:
-                if not self.parent.in_stroke:
-                    ev.accept()
-                    self.create_start(ev.pos())
-                    self.parent.stroke_appended = False
-                    self.parent.in_stroke = True
-                    self.drawAt(ev.pos(), ev)
-                else:
-                    ev.accept()
-                    self.end_stroke()
-                    self.parent.in_stroke = False
-            elif not self.parent.in_stroke:
-                y, x = int(ev.pos().y()), int(ev.pos().x())
-                if y >= 0 and y < self.parent.Ly and x >= 0 and x < self.parent.Lx:
-                    if ev.button() == QtCore.Qt.LeftButton and not ev.double():
-                        idx = self.parent.cellpix[self.parent.currentZ][y, x]
-                        if idx > 0:
-                            if ev.modifiers() & QtCore.Qt.ControlModifier:
-                                # delete mask selected
-                                self.parent.remove_cell(idx)
-                            elif ev.modifiers() & QtCore.Qt.AltModifier:
-                                self.parent.merge_cells(idx)
-                            elif self.parent.masksOn and not self.parent.deleting_multiple:
-                                self.parent.unselect_cell()
-                                self.parent.select_cell(idx)
-                            elif self.parent.deleting_multiple:
-                                if idx in self.parent.removing_cells_list:
-                                    self.parent.unselect_cell_multi(idx)
-                                    self.parent.removing_cells_list.remove(idx)
-                                else:
-                                    self.parent.select_cell_multi(idx)
-                                    self.parent.removing_cells_list.append(idx)
+        if not (self.parent.masksOn or
+                self.parent.outlinesOn) and self.parent.removing_region:
+            return
 
+        is_right_click = ev.button() == QtCore.Qt.RightButton
+        if self.parent.loaded \
+                and (is_right_click or ev.modifiers() & QtCore.Qt.ShiftModifier and not ev.double())\
+                and not self.parent.deleting_multiple:
+            if not self.parent.in_stroke:
+                ev.accept()
+                self.create_start(ev.pos())
+                self.parent.stroke_appended = False
+                self.parent.in_stroke = True
+                self.drawAt(ev.pos(), ev)
+            else:
+                ev.accept()
+                self.end_stroke()
+                self.parent.in_stroke = False
+        elif not self.parent.in_stroke:
+            y, x = int(ev.pos().y()), int(ev.pos().x())
+            if y >= 0 and y < self.parent.Ly and x >= 0 and x < self.parent.Lx:
+                if ev.button() == QtCore.Qt.LeftButton and not ev.double():
+                    idx = self.parent.cellpix[self.parent.currentZ][y, x]
+                    if idx > 0:
+                        if ev.modifiers() & QtCore.Qt.ControlModifier:
+                            # delete mask selected
+                            self.parent.remove_cell(idx)
+                        elif ev.modifiers() & QtCore.Qt.AltModifier:
+                            self.parent.merge_cells(idx)
                         elif self.parent.masksOn and not self.parent.deleting_multiple:
                             self.parent.unselect_cell()
+                            self.parent.select_cell(idx)
+                        elif self.parent.deleting_multiple:
+                            if idx in self.parent.removing_cells_list:
+                                self.parent.unselect_cell_multi(idx)
+                                self.parent.removing_cells_list.remove(idx)
+                            else:
+                                self.parent.select_cell_multi(idx)
+                                self.parent.removing_cells_list.append(idx)
+                    elif self.parent.masksOn and not self.parent.deleting_multiple:
+                        self.parent.unselect_cell()
 
+    @unsilence_exceptions
     def mouseDoubleClickEvent(self, ev) -> None:
         ev.accept()
         return
 
+    @unsilence_exceptions
     def mouseDragEvent(self, ev):
         if ev.button() == QtCore.Qt.RightButton:
             ev.accept()
@@ -680,6 +699,7 @@ class ImageDraw(pg.ImageItem):
             ev.ignore()
         return
 
+    @unsilence_exceptions
     def hoverEvent(self, ev):
         if self.parent.in_stroke:
             if self.parent.in_stroke:
@@ -723,7 +743,9 @@ class ImageDraw(pg.ImageItem):
                 return False
 
     def end_stroke(self, keep_stroke=True):
-        self.parent.p0.removeItem(self.scatter)
+        if hasattr(self, 'scatter') and self.scatter is not None:
+            if self.scatter.scene() == self.parent.layer.scene():
+                self.parent.p0.removeItem(self.scatter)
         if not keep_stroke:
             if not self.parent.stroke_appended:
                 self.parent.strokes.append(self.parent.current_stroke)
@@ -748,9 +770,11 @@ class ImageDraw(pg.ImageItem):
             self.parent.add_set()
         self.parent.in_stroke = False
 
+    @unsilence_exceptions
     def tabletEvent(self, ev):
         pass
 
+    @unsilence_exceptions
     def drawAt(self, pos, ev=None):
         mask = self.strokemask
         stroke = self.parent.current_stroke
@@ -795,6 +819,7 @@ class ImageDraw(pg.ImageItem):
                 stroke.append([self.parent.currentZ, x, y, iscent])
         self.updateImage()
 
+    @unsilence_exceptions
     def setDrawKernel(self, kernel_size=3):
         bs = kernel_size
         kernel = np.ones((bs, bs), np.uint8)
