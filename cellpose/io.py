@@ -90,7 +90,7 @@ def logger_setup(cp_path=".cellpose", logfile_name="run.log", stdout_file_replac
     formatter = logging.Formatter("%(asctime)s [%(module)s %(levelname)s] %(message)s")
     debug_formatter = logging.Formatter("%(asctime)s %(levelname)s [%(filename)s:%(lineno)d - %(funcName)20s()] %(message)s")
     logger = logging.getLogger('cellpose')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     logger.handlers.clear()
 
     logfile_fh.setFormatter(debug_formatter)
