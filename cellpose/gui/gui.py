@@ -245,7 +245,6 @@ class MainW(QMainWindow):
 
         self.lmain.addWidget(self.win, 0, 9, 40, 30)
 
-        self.win.scene().sigMouseClicked.connect(self.plot_clicked)
         self.win.scene().sigMouseMoved.connect(self.mouse_moved)
         self.make_viewbox()
         self.lmain.setColumnStretch(10, 1)
@@ -709,6 +708,14 @@ class MainW(QMainWindow):
                         return
                     elif event.key() == QtCore.Qt.Key_PageUp:
                         self.go_next_previous_dropdown(self.ViewDropDown, -1)
+                        event.accept()
+                        return
+                    elif event.key() == QtCore.Qt.Key_Space:
+                        try:
+                            self.p0.setYRange(0, self.Ly + self.pr)
+                        except:
+                            self.p0.setYRange(0, self.Ly)
+                        self.p0.setXRange(0, self.Lx)
                         event.accept()
                         return
 
@@ -1382,17 +1389,6 @@ class MainW(QMainWindow):
             self.update_layer()
 
         del self.strokes[stroke_ind]
-
-    def plot_clicked(self, event):
-        if event.button()==QtCore.Qt.LeftButton \
-                and not event.modifiers() & (QtCore.Qt.ShiftModifier | QtCore.Qt.AltModifier)\
-                and not self.removing_region:
-            if event.double():
-                try:
-                    self.p0.setYRange(0, self.Ly + self.pr)
-                except:
-                    self.p0.setYRange(0, self.Ly)
-                self.p0.setXRange(0, self.Lx)
 
     def cancel_remove_multiple(self):
         self.clear_multi_selected_cells()
