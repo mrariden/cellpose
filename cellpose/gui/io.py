@@ -41,23 +41,22 @@ def _add_model(parent, filename=None, load_model=True):
 
     for ind, model_string in enumerate(parent.model_strings[:-1]):
         if model_string == fname:
-            _remove_model(parent, ind=ind + 1, verbose=False)
+            _remove_model(parent, ind=ind + 1)
 
     parent.ModelChooseC.setCurrentIndex(len(parent.model_strings))
     if load_model:
         parent.model_choose(custom=True)
 
 
-def _remove_model(parent, ind=None, verbose=True):
+def _remove_model(parent, ind=None):
     if ind is None:
         ind = parent.ModelChooseC.currentIndex()
     if ind > 0:
-        ind -= 1
-        parent.ModelChooseC.removeItem(ind + 1)
-        del parent.model_strings[ind]
-        # remove model from txt path
         modelstr = parent.ModelChooseC.currentText()
+        parent.ModelChooseC.removeItem(ind)
+        # remove model from txt path
         remove_model(modelstr)
+        parent.model_strings.remove(modelstr)
         if len(parent.model_strings) > 0:
             parent.ModelChooseC.setCurrentIndex(len(parent.model_strings))
         else:
