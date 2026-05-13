@@ -41,7 +41,7 @@ def _add_model(parent, filename=None, load_model=True):
 
     for ind, model_string in enumerate(parent.model_strings[:-1]):
         if model_string == fname:
-            _remove_model(parent, ind=ind + 1, verbose=False)
+            _remove_model(parent, ind=ind + 1)
 
     parent.ModelChooseC.setCurrentIndex(len(parent.model_strings))
     if load_model:
