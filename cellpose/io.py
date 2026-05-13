@@ -347,10 +347,10 @@ def remove_model(filename, delete=False):
         # write empty file
         textfile = open(models.MODEL_LIST_PATH, "w")
         textfile.close()
-    print(f"{filename} removed from custom model list")
+    io_logger.info(f"{filename} removed from custom model list")
     if delete:
-        os.remove(os.fspath(models.MODEL_DIR.joinpath(fname)))
-        print("model deleted")
+        os.remove(os.fspath(models.MODEL_DIR.joinpath(filename)))
+        io_logger.info(f"{filename} model deleted from disk")
 
 
 def add_model(filename):
