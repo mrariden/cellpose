@@ -110,6 +110,8 @@ class MainW_3d(MainW):
         # MainW init
         MainW.__init__(self, image=image, logger=logger)
 
+        self.win.scene().sigMouseClicked.connect(self.plot_clicked)
+
         # add gradZ view
         self.ViewDropDown.insertItem(3, "gradZ")
 
@@ -561,13 +563,7 @@ class MainW_3d(MainW):
         if event.button()==QtCore.Qt.LeftButton \
                 and not event.modifiers() & (QtCore.Qt.ShiftModifier | QtCore.Qt.AltModifier)\
                 and not self.removing_region:
-            if event.double():
-                try:
-                    self.p0.setYRange(0, self.Ly + self.pr)
-                except:
-                    self.p0.setYRange(0, self.Ly)
-                self.p0.setXRange(0, self.Lx)
-            elif self.loaded and not self.in_stroke:
+            if self.loaded and not self.in_stroke:
                 if self.orthobtn.isChecked():
                     items = self.win.scene().items(event.scenePos())
                     for x in items:
