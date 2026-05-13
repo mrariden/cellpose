@@ -79,7 +79,7 @@ def logger_setup(cp_path=".cellpose", logfile_name="run.log", stdout_file_replac
     log_file = cp_dir.joinpath(logfile_name)
     try:
         log_file.unlink()
-    except:
+    except FileNotFoundError:
         print('creating new log file')
     logfile_fh = logging.FileHandler(log_file)
     if stdout_file_replacement is not None:
@@ -348,6 +348,9 @@ def remove_model(filename, delete=False):
     filename = os.path.split(filename)[-1]
     from . import models
     model_strings = models.get_user_models()
+    if filename not in model_strings:
+        raise ValueError(f'filename not found: {filename}')
+    model_strings.remove(filename)
     if len(model_strings) > 0:
         with open(models.MODEL_LIST_PATH, "w") as textfile:
             for fname in model_strings:
@@ -356,10 +359,10 @@ def remove_model(filename, delete=False):
         # write empty file
         textfile = open(models.MODEL_LIST_PATH, "w")
         textfile.close()
-    print(f"{filename} removed from custom model list")
+    io_logger.info(f"{filename} removed from custom model list")
     if delete:
-        os.remove(os.fspath(models.MODEL_DIR.joinpath(fname)))
-        print("model deleted")
+        os.remove(os.fspath(models.MODEL_DIR.joinpath(filename)))
+        io_logger.info(f"{filename} model deleted from disk")
 
 
 def add_model(filename):

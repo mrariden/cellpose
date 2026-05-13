@@ -1030,7 +1030,7 @@ class MainW(QMainWindow):
         self.remove_roi_obj = None
 
     @property
-    def color(self):
+    def color(self) -> str:
         """Current color display mode as a lowercase string.
 
         Reflects the current selection of the RGBDropDown widget. Possible
@@ -1162,8 +1162,13 @@ class MainW(QMainWindow):
         self.update_layer()
 
     def select_cell(self, idx):
+        """ Select a cell 
+        
+        Set the `.selected` property to idx, update `.layerz`, and call `.update_layer()`.
+        """
         self.prev_selected = self.selected
         self.selected = idx
+        self.logger.debug(f'selected cell: {self.selected}')
         if self.selected > 0:
             z = self.currentZ
             self.layerz[self.cellpix[z] == idx] = np.array(
@@ -1312,37 +1317,43 @@ class MainW(QMainWindow):
     def merge_cells(self, idx):
         self.prev_selected = self.selected
         self.selected = idx
-        if self.selected != self.prev_selected:
-            for z in range(self.NZ):
-                ar0, ac0 = np.nonzero(self.cellpix[z] == self.prev_selected)
-                ar1, ac1 = np.nonzero(self.cellpix[z] == self.selected)
-                touching = np.logical_and((ar0[:, np.newaxis] - ar1) < 3,
-                                          (ac0[:, np.newaxis] - ac1) < 3).sum()
-                ar = np.hstack((ar0, ar1))
-                ac = np.hstack((ac0, ac1))
-                vr0, vc0 = np.nonzero(self.outpix[z] == self.prev_selected)
-                vr1, vc1 = np.nonzero(self.outpix[z] == self.selected)
-                self.outpix[z, vr0, vc0] = 0
-                self.outpix[z, vr1, vc1] = 0
-                if touching > 0:
-                    mask = np.zeros((np.ptp(ar) + 4, np.ptp(ac) + 4), np.uint8)
-                    mask[ar - ar.min() + 2, ac - ac.min() + 2] = 1
-                    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-                    contour = contours[np.argmax([c.size for c in contours])]
-                    pvc, pvr = contour.squeeze().T
-                    vr, vc = pvr + ar.min() - 2, pvc + ac.min() - 2
+        if self.selected == self.prev_selected:
+            self.logger.debug('Cells are same, skipping merging')
+            return
+        if 0 in [self.prev_selected, self.selected]:
+            self.logger.debug('Skipping attempted merge with background')
+            return
+        self.logger.debug(f'Attempting to merge {self.prev_selected} and {self.selected}')
+        for z in range(self.NZ):
+            ar0, ac0 = np.nonzero(self.cellpix[z] == self.prev_selected)
+            ar1, ac1 = np.nonzero(self.cellpix[z] == self.selected)
+            touching = np.logical_and((ar0[:, np.newaxis] - ar1) < 3,
+                                      (ac0[:, np.newaxis] - ac1) < 3).sum()
+            ar = np.hstack((ar0, ar1))
+            ac = np.hstack((ac0, ac1))
+            vr0, vc0 = np.nonzero(self.outpix[z] == self.prev_selected)
+            vr1, vc1 = np.nonzero(self.outpix[z] == self.selected)
+            self.outpix[z, vr0, vc0] = 0
+            self.outpix[z, vr1, vc1] = 0
+            if touching > 0:
+                mask = np.zeros((np.ptp(ar) + 4, np.ptp(ac) + 4), np.uint8)
+                mask[ar - ar.min() + 2, ac - ac.min() + 2] = 1
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                contour = contours[np.argmax([c.size for c in contours])]
+                pvc, pvr = contour.squeeze().T
+                vr, vc = pvr + ar.min() - 2, pvc + ac.min() - 2
 
-                else:
-                    vr = np.hstack((vr0, vr1))
-                    vc = np.hstack((vc0, vc1))
-                color = self.cellcolors[self.prev_selected]
-                self.draw_mask(z, ar, ac, vr, vc, color, idx=self.prev_selected)
-            self.remove_cell(self.selected)
-            print("GUI_INFO: merged two cells")
-            self.update_layer()
-            io._save_sets_with_check(self)
-            self.undo.setEnabled(False)
-            self.redo.setEnabled(False)
+            else:
+                vr = np.hstack((vr0, vr1))
+                vc = np.hstack((vc0, vc1))
+            color = self.cellcolors[self.prev_selected]
+            self.draw_mask(z, ar, ac, vr, vc, color, idx=self.prev_selected)
+        self.remove_cell(self.selected)
+        self.logger.info("merged two cells")
+        self.update_layer()
+        io._save_sets_with_check(self)
+        self.undo.setEnabled(False)
+        self.redo.setEnabled(False)
 
     def undo_remove_cell(self):
         if len(self.removed_cell) > 0:
