@@ -110,6 +110,8 @@ class MainW_3d(MainW):
         # MainW init
         MainW.__init__(self, image=image, logger=logger)
 
+        self.win.scene().sigMouseClicked.connect(self.plot_clicked)
+
         # add gradZ view
         self.ViewDropDown.insertItem(3, "gradZ")
 
@@ -289,9 +291,10 @@ class MainW_3d(MainW):
                     ar, ac = np.nonzero(mask)
                     ar, ac = ar + vr.min() - 2, ac + vc.min() - 2
                     # get dense outline
-                    contours = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                                cv2.CHAIN_APPROX_NONE)
-                    pvc, pvr = contours[-2][0].squeeze().T
+                    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
+                                                   cv2.CHAIN_APPROX_NONE)
+                    contour = contours[np.argmax([c.size for c in contours])]
+                    pvc, pvr = contour.squeeze().T
                     vr, vc = pvr + vr.min() - 2, pvc + vc.min() - 2
                     # concatenate all points
                     ar, ac = np.hstack((np.vstack((vr, vc)), np.vstack((ar, ac))))
@@ -305,9 +308,9 @@ class MainW_3d(MainW):
                         # compute outline of new mask
                         mask = np.zeros((np.ptp(ar) + 4, np.ptp(ac) + 4), "uint8")
                         mask[ar - ar.min() + 2, ac - ac.min() + 2] = 1
-                        contours = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                                    cv2.CHAIN_APPROX_NONE)
-                        pvc, pvr = contours[-2][0].squeeze().T
+                        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                        contour = contours[np.argmax([c.size for c in contours])]
+                        pvc, pvr = contour.squeeze().T
                         vr, vc = pvr + ar.min() - 2, pvc + ac.min() - 2
                     ars = np.concatenate((ars, ar), axis=0)
                     acs = np.concatenate((acs, ac), axis=0)
@@ -560,13 +563,7 @@ class MainW_3d(MainW):
         if event.button()==QtCore.Qt.LeftButton \
                 and not event.modifiers() & (QtCore.Qt.ShiftModifier | QtCore.Qt.AltModifier)\
                 and not self.removing_region:
-            if event.double():
-                try:
-                    self.p0.setYRange(0, self.Ly + self.pr)
-                except:
-                    self.p0.setYRange(0, self.Ly)
-                self.p0.setXRange(0, self.Lx)
-            elif self.loaded and not self.in_stroke:
+            if self.loaded and not self.in_stroke:
                 if self.orthobtn.isChecked():
                     items = self.win.scene().items(event.scenePos())
                     for x in items:
@@ -621,6 +618,11 @@ class MainW_3d(MainW):
                         self.scroll.setValue(self.currentZ)
                         event.accept()
                         return
+
+            # when in stroke, allow escaping out of drawing
+            else: 
+                if event.key() == QtCore.Qt.Key_Escape:
+                    self.layer.end_stroke(keep_stroke=False)
         if event.key() == QtCore.Qt.Key_Minus or event.key() == QtCore.Qt.Key_Equal:
             self.p0.keyPressEvent(event)
             event.accept()

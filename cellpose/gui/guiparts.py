@@ -688,8 +688,16 @@ class ImageDraw(pg.ImageItem):
                         self.parent.unselect_cell()
 
     @unsilence_exceptions
+    def mouseDoubleClickEvent(self, ev) -> None:
+        ev.accept()
+        return
+
+    @unsilence_exceptions
     def mouseDragEvent(self, ev):
-        ev.ignore()
+        if ev.button() == QtCore.Qt.RightButton:
+            ev.accept()
+        else:
+            ev.ignore()
         return
 
     @unsilence_exceptions
@@ -718,6 +726,9 @@ class ImageDraw(pg.ImageItem):
         # first check if you ever left the start
         if len(self.parent.current_stroke) > 3:
             stroke = np.array(self.parent.current_stroke)
+            stroke = stroke[stroke[:, 0] == self.parent.currentZ]
+            if len(stroke) <= 3:
+                return False
             dist = (((stroke[1:, 1:] -
                       stroke[:1, 1:][np.newaxis, :, :])**2).sum(axis=-1))**0.5
             dist = dist.flatten()
@@ -732,10 +743,19 @@ class ImageDraw(pg.ImageItem):
             else:
                 return False
 
-    def end_stroke(self):
+    def end_stroke(self, keep_stroke=True):
         if hasattr(self, 'scatter') and self.scatter is not None:
             if self.scatter.scene() == self.parent.layer.scene():
                 self.parent.p0.removeItem(self.scatter)
+        if not keep_stroke:
+            if not self.parent.stroke_appended:
+                self.parent.strokes.append(self.parent.current_stroke)
+                self.parent.stroke_appended = True
+            self.parent.remove_stroke(delete_points=False)
+            self.parent.current_stroke = [s for s in self.parent.current_stroke
+                                          if s[0] != self.parent.currentZ]
+            self.parent.in_stroke = False
+            return
         if not self.parent.stroke_appended:
             self.parent.strokes.append(self.parent.current_stroke)
             self.parent.stroke_appended = True

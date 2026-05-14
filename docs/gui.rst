@@ -40,28 +40,28 @@ For multi-Z 3D data, please use the 3D version of the GUI:
 Using the GUI 
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The GUI serves two main functions:
+The GUI serves three main functions:
 
 1. Running the segmentation algorithm.
 2. Manually labelling data.
-3. (NEW) Fine-tuning a pretrained cellpose model on your own data.
+3. Fine-tuning a pretrained cellpose model on your own data.
 
 Main GUI mouse controls (works in all views):
 
 -  Pan = left-click + drag
 -  Zoom = scroll wheel (or +/= and - buttons)
--  Full view = double left-click
 -  Select mask = left-click on mask
 -  Delete mask = Ctrl (or Command on Mac) + left-click
 -  Merge masks = Alt + left-click (will merge last two)
 -  Start draw mask = right-click
--  End draw mask = right-click, or return to circle at beginning
+-  End draw mask = press esc, right-click, or return to circle at beginning
 
 Drawing masks 
 ~~~~~~~~~~~~~~~~~~~~~~
 
 Masks are started with right-click, then hover your mouse (do not hold it down), 
 and return it to the red circle to complete the mask. The mask should now be completed.
+At any point, you can escape drawing a mask with the Esc key.
 
 Overlaps in masks are NOT allowed. If you draw a mask on top of another
 mask, it is cropped so that it doesn't overlap with the old mask. Masks
@@ -145,6 +145,8 @@ Keyboard shortcuts
 | CTRL+H              | help                                          |
 +---------------------+-----------------------------------------------+            
 | =/+  // -           | zoom in // zoom out                           |
++---------------------+-----------------------------------------------+
+| SPACE               | reset zoom                                    |
 +---------------------+-----------------------------------------------+
 | CTRL+Z              | undo previously drawn mask/stroke             |
 +---------------------+-----------------------------------------------+

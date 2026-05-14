@@ -245,7 +245,6 @@ class MainW(QMainWindow):
 
         self.lmain.addWidget(self.win, 0, 9, 40, 30)
 
-        self.win.scene().sigMouseClicked.connect(self.plot_clicked)
         self.win.scene().sigMouseMoved.connect(self.mouse_moved)
         self.make_viewbox()
         self.lmain.setColumnStretch(10, 1)
@@ -711,6 +710,14 @@ class MainW(QMainWindow):
                         self.go_next_previous_dropdown(self.ViewDropDown, -1)
                         event.accept()
                         return
+                    elif event.key() == QtCore.Qt.Key_Space:
+                        try:
+                            self.p0.setYRange(0, self.Ly + self.pr)
+                        except:
+                            self.p0.setYRange(0, self.Ly)
+                        self.p0.setXRange(0, self.Lx)
+                        event.accept()
+                        return
 
                 # can change background or stroke size if cell not finished
                 if event.key() == QtCore.Qt.Key_Up or event.key() == QtCore.Qt.Key_W:
@@ -753,6 +760,11 @@ class MainW(QMainWindow):
                         gci = min(count - 1, gci + 1)
                     self.BrushChoose.setCurrentIndex(gci)
                     self.brush_choose()
+            
+            # when in stroke, allow escaping out of drawing
+            else: 
+                if event.key() == QtCore.Qt.Key_Escape:
+                    self.layer.end_stroke(keep_stroke=False)
         if event.key() == QtCore.Qt.Key_Minus or event.key() == QtCore.Qt.Key_Equal:
             self.p0.keyPressEvent(event)
 
@@ -1389,17 +1401,6 @@ class MainW(QMainWindow):
 
         del self.strokes[stroke_ind]
 
-    def plot_clicked(self, event):
-        if event.button()==QtCore.Qt.LeftButton \
-                and not event.modifiers() & (QtCore.Qt.ShiftModifier | QtCore.Qt.AltModifier)\
-                and not self.removing_region:
-            if event.double():
-                try:
-                    self.p0.setYRange(0, self.Ly + self.pr)
-                except:
-                    self.p0.setYRange(0, self.Ly)
-                self.p0.setXRange(0, self.Lx)
-
     def cancel_remove_multiple(self):
         self.clear_multi_selected_cells()
         self.done_remove_multiple_cells()
@@ -1582,8 +1583,9 @@ class MainW(QMainWindow):
             ar, ac = np.nonzero(mask)
             ar, ac = ar + vr.min() - 2, ac + vc.min() - 2
             # get dense outline
-            contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-            pvc, pvr = contours[-2][0][:,0].T
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            contour = contours[np.argmax([c.size for c in contours])]
+            pvc, pvr = contour[:,0].T
             vr, vc = pvr + vr.min() - 2, pvc + vc.min() - 2
             # concatenate all points
             ar, ac = np.hstack((np.vstack((vr, vc)), np.vstack((ar, ac))))
@@ -1597,9 +1599,9 @@ class MainW(QMainWindow):
                 # compute outline of new mask
                 mask = np.zeros((np.ptp(vr) + 4, np.ptp(vc) + 4), np.uint8)
                 mask[ar - vr.min() + 2, ac - vc.min() + 2] = 1
-                contours = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                            cv2.CHAIN_APPROX_NONE)
-                pvc, pvr = contours[-2][0][:,0].T
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                contour = contours[np.argmax([c.size for c in contours])]
+                pvc, pvr = contour[:,0].T
                 vr, vc = pvr + vr.min() - 2, pvc + vc.min() - 2
             ars = np.concatenate((ars, ar), axis=0)
             acs = np.concatenate((acs, ac), axis=0)
@@ -1648,9 +1650,9 @@ class MainW(QMainWindow):
                 arr, acr = np.nonzero(mask)
                 arr, acr = arr + vrr.min() - 2, acr + vcr.min() - 2
                 # get dense outline
-                contours = cv2.findContours(mask, cv2.RETR_EXTERNAL,
-                                            cv2.CHAIN_APPROX_NONE)
-                pvc, pvr = contours[-2][0].squeeze().T
+                contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                contour = contours[np.argmax([c.size for c in contours])]
+                pvc, pvr = contour.squeeze().T
                 vrr, vcr = pvr + vrr.min() - 2, pvc + vcr.min() - 2
                 # concatenate all points
                 arr, acr = np.hstack((np.vstack((vrr, vcr)), np.vstack((arr, acr))))
