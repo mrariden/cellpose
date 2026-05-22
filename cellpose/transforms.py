@@ -2,7 +2,7 @@
 Copyright © 2025 Howard Hughes Medical Institute, Authored by Carsen Stringer , Michael Rariden and Marius Pachitariu.
 """
 import logging
-
+import time
 import cv2
 import numpy as np
 import torch
@@ -847,6 +847,7 @@ def resize_image(img0, Ly=None, Lx=None, rsz=None, interpolation=cv2.INTER_LINEA
         ValueError: If Ly is None and rsz is None.
 
     """
+    tic = time.time()
     if Ly is None and rsz is None:
         error_message = "must give size to resize to or factor to use for resizing"
         transforms_logger.critical(error_message)
@@ -879,6 +880,7 @@ def resize_image(img0, Ly=None, Lx=None, rsz=None, interpolation=cv2.INTER_LINEA
             imgs[i] = imgi if imgi.ndim > 2 or no_channels else imgi[..., np.newaxis]
     else:
         imgs = resize_safe(img0, Ly, Lx, interpolation=interpolation)
+    transforms_logger.debug(f'resize time: {time.time() - tic:.2f}')
     return imgs
 
 def get_pad_yx(Ly, Lx, div=16, extra=1, min_size=None):

@@ -5,6 +5,7 @@ import logging
 import numpy as np
 from tqdm import trange
 from . import transforms, utils
+import time
 
 import torch
 
@@ -226,6 +227,7 @@ def run_net(net, imgi, batch_size=8, augment=False, tile_overlap=0.1, bsize=224,
         
         # run network
         for j in range(0, IMGa.shape[0], batch_size):
+            tic = time.time()
             bslc = slice(j, min(j + batch_size, IMGa.shape[0]))
             ya0, stylea0 = _forward(net, IMGa[bslc])
             if j == 0:
@@ -234,6 +236,7 @@ def run_net(net, imgi, batch_size=8, augment=False, tile_overlap=0.1, bsize=224,
                 stylea = np.zeros((IMGa.shape[0], 256), "float32")
             ya[bslc] = ya0
             stylea[bslc] = stylea0
+            core_logger.debug(f"batch inference time: {time.time() - tic}")
 
         # average tiles
         for i, b in enumerate(inds):

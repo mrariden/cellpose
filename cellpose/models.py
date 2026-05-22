@@ -391,6 +391,8 @@ class CellposeModel():
         net_time = time.time() - tic
         if nimg > 1:
             models_logger.info("network run in %2.2fs" % (net_time))
+        else:
+            models_logger.debug(f'Network time: {net_time:.2f}')
 
         return dP, cellprob, styles
     

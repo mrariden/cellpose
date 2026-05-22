@@ -10,6 +10,7 @@ import numpy as np
 import tifffile
 from tqdm import trange
 import fastremap
+import time
 
 import logging
 
@@ -367,10 +368,12 @@ def steps_interp(dP, inds, niter, device=torch.device("cpu")):
     
     # dynamics
     for t in range(niter):
+        tic = time.time()
         dPt = torch.nn.functional.grid_sample(im, pt, align_corners=False)
         for k in range(ndim):  #clamp the final pixel locations
             pt[..., k] += dPt[:, k]
             torch.clamp_(pt[..., k], -1., 1.)
+        dynamics_logger.debug(f"Dynamics step time: {time.time() - tic:.2f}")
 
     #undo the normalization from before, reverse order of operations
     pt += 1 
@@ -692,7 +695,7 @@ def compute_masks(dP, cellprob, p=None, niter=200, cellprob_threshold=0.0,
     Returns:
         tuple: A tuple containing the computed masks and the final pixel locations.
     """
-    
+    tic = time.time()
     if (cellprob > cellprob_threshold).sum():  #mask at this point is a cell cluster binary map, not labels
         inds = np.nonzero(cellprob > cellprob_threshold)
         if len(inds[0]) == 0:
@@ -737,4 +740,5 @@ def compute_masks(dP, cellprob, p=None, niter=200, cellprob_threshold=0.0,
         dynamics_logger.warning(
             "more than 65535 masks in image, masks returned as np.uint32")
 
+    dynamics_logger.debug(f"compute_masks time: {time.time() - tic:.2f}")
     return mask
